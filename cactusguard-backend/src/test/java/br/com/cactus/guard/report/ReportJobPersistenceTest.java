@@ -1,0 +1,37 @@
+package br.com.cactus.guard.report;
+
+import br.com.cactus.guard.report.repository.ReportJobRepository;
+import br.com.cactus.guard.report.dto.ReportGenerateRequest;
+import br.com.cactus.guard.report.service.ReportService;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+
+import java.util.Map;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest
+@ActiveProfiles("test")
+class ReportJobPersistenceTest {
+
+    @Autowired
+    private ReportService reportService;
+
+    @Autowired
+    private ReportJobRepository jobRepository;
+
+    @Test
+    void generatedJobShouldBePersisted() {
+        ReportGenerateRequest request = new ReportGenerateRequest();
+        request.setFormat("PDF");
+        request.setParameters(Map.of("test", true));
+
+        var job = reportService.generate("CASES_SLA", request);
+
+        var persisted = jobRepository.findById(job.getId());
+        assertTrue(persisted.isPresent());
+        assertEquals("CASES_SLA", persisted.get().getReportCode());
+    }
+}

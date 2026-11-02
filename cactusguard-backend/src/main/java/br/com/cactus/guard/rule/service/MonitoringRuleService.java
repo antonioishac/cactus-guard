@@ -1,0 +1,87 @@
+package br.com.cactus.guard.rule.service;
+
+import br.com.cactus.guard.rule.dto.MonitoringRuleResponse;
+import br.com.cactus.guard.rule.entity.MonitoringRule;
+import br.com.cactus.guard.rule.repository.MonitoringRuleRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+@Service
+@RequiredArgsConstructor
+public class MonitoringRuleService {
+
+    private final MonitoringRuleRepository ruleRepository;
+
+    @Transactional(readOnly = true)
+    @Cacheable(value = "rules", key = "'active'")
+    public List<MonitoringRuleResponse> findAllActive() {
+        return ruleRepository.findByActiveTrue().stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    @Cacheable(value = "rules", key = "'category:' + #category")
+    public List<MonitoringRuleResponse> findByCategory(String category) {
+        return ruleRepository.findByCategoryAndActiveTrue(category).stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "rules", key = "'active'"),
+            @CacheEvict(value = "rules", allEntries = true)
+    })
+    public MonitoringRuleResponse toggleActive(String code, boolean active) {
+        MonitoringRule rule = ruleRepository.findByCode(code)
+                .orElseThrow(() -> new IllegalArgumentException("Rule not found: " + code));
+        rule.setActive(active);
+        rule = ruleRepository.save(rule);
+        return toResponse(rule);
+    }
+
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "rules", key = "'active'"),
+            @CacheEvict(value = "rules", allEntries = true)
+    })
+    public MonitoringRuleResponse create(MonitoringRule rule) {
+        rule = ruleRepository.save(rule);
+        return toResponse(rule);
+    }
+
+    @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "rules", key = "'active'"),
+            @CacheEvict(value = "rules", allEntries = true)
+    })
+    public MonitoringRuleResponse update(String code, MonitoringRule updated) {
+        MonitoringRule rule = ruleRepository.findByCode(code)
+                .orElseThrow(() -> new IllegalArgumentException("Rule not found: " + code));
+        rule.setName(updated.getName());
+        rule.setDescription(updated.getDescription());
+        rule.setSeverity(updated.getSeverity());
+        rule.setThresholdValue(updated.getThresholdValue());
+        rule.setThresholdPeriodDays(updated.getThresholdPeriodDays());
+        rule = ruleRepository.save(rule);
+        return toResponse(rule);
+    }
+
+    private MonitoringRuleResponse toResponse(MonitoringRule rule) {
+        return MonitoringRuleResponse.builder()
+                .id(rule.getId())
+                .code(rule.getCode())
+                .name(rule.getName())
+                .description(rule.getDescription())
+                .category(rule.getCategory())
+                .severity(rule.getSeverity())
+                .active(rule.isActive())
+                .thresholdValue(rule.getThresholdValue())
+                .thresholdPeriodDays(rule.getThresholdPeriodDays())
+                .build();
+    }
+}

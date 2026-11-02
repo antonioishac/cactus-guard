@@ -1,0 +1,38 @@
+package br.com.cactus.guard.kyc;
+
+import br.com.cactus.guard.kyc.service.KycService;
+import br.com.cactus.guard.party.entity.Party;
+import br.com.cactus.guard.party.repository.PartyRepository;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest
+@ActiveProfiles("test")
+class KycFindByStatusTest {
+
+    @Autowired
+    private KycService kycService;
+
+    @Autowired
+    private PartyRepository partyRepository;
+
+    @Test
+    void findByStatusShouldReturnProcesses() {
+        Party party = Party.builder()
+                .type("PF")
+                .document("39393939393")
+                .name("Find Status KYC")
+                .status("ACTIVE")
+                .build();
+        party = partyRepository.save(party);
+
+        kycService.startOnboarding(party.getId());
+
+        var page = kycService.findByStatus("IN_PROGRESS", org.springframework.data.domain.Pageable.unpaged());
+        assertFalse(page.isEmpty());
+    }
+}
