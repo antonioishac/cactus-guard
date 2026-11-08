@@ -1,0 +1,22 @@
+# Contexto mínimo para o Dockerfile multi-stage: .mvn/, mvnw, pom.xml e src/.
+# Nada de artefatos locais, relatórios (podem conter PII) ou segredos no contexto de build.
+target/
+reports/
+uploads/
+storage/
+logs/
+*.log
+.idea/
+*.iml
+.vscode/
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.jks
+Dockerfile
+.dockerignore
+README.md
+CLAUDE.md
+mvnw.cmd

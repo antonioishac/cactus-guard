@@ -144,6 +144,11 @@
             <artifactId>openpdf</artifactId>
             <version>${openpdf.version}</version>
         </dependency>
+        <!-- Eventos de dominio (spec 047/048): Kafka + outbox transacional -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-kafka</artifactId>
+        </dependency>
 
         <!-- Testes -->
         <dependency>
@@ -184,6 +189,11 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers-postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers-kafka</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
@@ -238,7 +248,8 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <argLine>"-javaagent:${org.mockito:mockito-core:jar}" -Xshare:off</argLine>
+                    <!-- @{argLine} = agente do JaCoCo (prepare-agent); vazio se -Djacoco.skip=true -->
+                    <argLine>@{argLine} "-javaagent:${org.mockito:mockito-core:jar}" -Xshare:off</argLine>
                 </configuration>
             </plugin>
             <!-- Testes *IT (Testcontainers/PostgreSQL) rodam em `mvn verify` -->
@@ -246,7 +257,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
-                    <argLine>"-javaagent:${org.mockito:mockito-core:jar}" -Xshare:off</argLine>
+                    <argLine>@{argLine} "-javaagent:${org.mockito:mockito-core:jar}" -Xshare:off</argLine>
                 </configuration>
                 <executions>
                     <execution>
@@ -256,6 +267,70 @@
                         </goals>
                     </execution>
                 </executions>
+            </plugin>
+            <!-- Cobertura (unit + IT no mesmo jacoco.exec). Relatório XML/HTML/CSV em target/site/jacoco
+                 na fase verify. Meta inicial em docs/engenharia/ci-cd.md; o check só AVISA por ora
+                 (haltOnFailure=false) — virar true após algumas semanas estável acima da meta. -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.16</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <formats>
+                                <format>XML</format>
+                                <format>HTML</format>
+                                <format>CSV</format>
+                            </formats>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <haltOnFailure>false</haltOnFailure>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
+                                        </limit>
+                                        <limit>
+                                            <counter>BRANCH</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.65</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- SBOM CycloneDX: versão e execução herdadas do spring-boot-starter-parent
+                 (makeAggregateBom em generate-resources -> target/classes/META-INF/sbom/application.cdx.json,
+                 embutido no jar). O endpoint /actuator/sbom NÃO é exposto (management.endpoints.web.exposure). -->
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
             </plugin>
         </plugins>
     </build>

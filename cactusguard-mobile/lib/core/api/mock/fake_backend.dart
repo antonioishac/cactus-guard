@@ -9,7 +9,8 @@ import 'fake_data.dart';
 /// do Dio: todo o pipeline real (interceptor JWT, refresh em fila, mapeamento de erro) é exercitado.
 ///
 /// Dados 100% fictícios, sem PII real; documentos já chegam mascarados, como no backend.
-/// Usuários: `analista`, `supervisor`, `admin`, `auditor` — senha [password].
+/// Usuários iguais aos dev do backend local: `analista`, `supervisor`, `supervisor2`, `auditor` (senha
+/// [password]) e `admin` (senha [adminPassword]).
 class FakeBackend implements HttpClientAdapter {
   FakeBackend({
     this.latency = const Duration(milliseconds: 250),
@@ -17,7 +18,8 @@ class FakeBackend implements HttpClientAdapter {
     DateTime Function()? clock,
   }) : _clock = clock ?? DateTime.now;
 
-  static const password = 'cactus123';
+  static const password = 'dev12345';
+  static const adminPassword = 'admin123';
 
   /// Atraso simulado de cada resposta.
   Duration latency;
@@ -42,6 +44,7 @@ class FakeBackend implements HttpClientAdapter {
   final Map<String, DateTime> _access = {};
   final Map<String, String> _refresh = {}; // refresh -> username
   final Map<String, String> _accessUser = {};
+  final Map<String, Map<String, dynamic>> _prefs = {};
   int _seq = 0;
 
   static final Map<String, Map<String, dynamic>> users = {
@@ -56,6 +59,12 @@ class FakeBackend implements HttpClientAdapter {
       'username': 'supervisor',
       'name': 'Sérgio Supervisor (fictício)',
       'roles': ['ROLE_SUPERVISOR'],
+    },
+    'supervisor2': {
+      'id': '0b6a1d0e-5555-4a8e-9f00-000000000005',
+      'username': 'supervisor2',
+      'name': 'Sofia Supervisora (fictícia)',
+      'roles': ['SUPERVISOR'],
     },
     'admin': {
       'id': '0b6a1d0e-3333-4a8e-9f00-000000000003',
@@ -121,6 +130,14 @@ class FakeBackend implements HttpClientAdapter {
         registeredDevices.removeWhere((d) => d['token'] == token);
         registeredDevices.add({...body, 'user': user});
         return _json(201, {'token': token, 'platform': platform});
+      case ('GET', ['devices', 'preferences']):
+        return _json(200, _prefs[user] ?? {'criticalAlerts': true, 'deadlines': true});
+      case ('PUT', ['devices', 'preferences']):
+        if (body['criticalAlerts'] is! bool || body['deadlines'] is! bool) {
+          return _error(400, 'VALIDATION_ERROR', 'Preferências inválidas');
+        }
+        _prefs[user] = {'criticalAlerts': body['criticalAlerts'], 'deadlines': body['deadlines']};
+        return _json(200, _prefs[user]);
       case ('DELETE', ['devices', final token]):
         registeredDevices.removeWhere((d) => d['token'] == Uri.decodeComponent(token));
         return _json(204, null);
@@ -147,7 +164,8 @@ class FakeBackend implements HttpClientAdapter {
   ResponseBody _login(Map<String, dynamic> body) {
     loginCalls++;
     final u = users[body['username']];
-    if (u == null || body['password'] != password) {
+    final expected = body['username'] == 'admin' ? adminPassword : password;
+    if (u == null || body['password'] != expected) {
       return _error(401, 'UNAUTHORIZED', 'Credenciais inválidas');
     }
     return _json(200, _issue(u['username'] as String));

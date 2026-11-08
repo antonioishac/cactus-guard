@@ -55,14 +55,44 @@ public class RuleEngineService {
     private final AlertCreationService alertCreation;
     private final CashCommunicationService cashCommunication;
 
-    @Transactional
-    public int evaluateAllActiveRules() {
+    /** Cenarios guiados por transacao: unicos avaliados no monitoramento por evento (os demais seguem em batch). */
+    static final Set<String> TRANSACTIONAL_RULES = Set.of("TXN_HIGH_VALUE", "TXN_VELOCITY", "STRUCTURING",
+            "UNUSUAL_PATTERN", "PEP_TRANSACTION", "PASS_THROUGH", "ROUND_AMOUNTS", "HIGH_RISK_JURISDICTION",
+            "PROFILE_INCOMPATIBLE");
+
+    private List<MonitoringRule> activeRules() {
         Instant now = Instant.now();
-        List<MonitoringRule> rules = ruleRepository.findByActiveTrue().stream()
+        return ruleRepository.findByActiveTrue().stream()
                 .filter(r -> "ACTIVE".equals(r.getStatus()))
                 .filter(r -> r.getEffectiveFrom() == null || !r.getEffectiveFrom().isAfter(now))
                 .filter(r -> r.getEffectiveTo() == null || r.getEffectiveTo().isAfter(now))
                 .toList();
+    }
+
+    /**
+     * Monitoramento quase em tempo real (consumidor de TransactionReceived): roda as regras transacionais ativas
+     * apenas para a PARTE da transacao, reutilizando exatamente os mesmos cenarios do batch (mesmas consultas
+     * com o filtro opcional de parte). Janelas longas continuam no batch de 6h. COE (especie) ja e avaliada
+     * sincronamente na criacao da transacao e as regras de screening/watchlist nao dependem de transacao.
+     */
+    @Transactional
+    public int evaluateForTransaction(UUID transactionId) {
+        Transaction txn = transactionRepository.findById(transactionId)
+                .orElseThrow(() -> new IllegalArgumentException("Transaction not found: " + transactionId));
+        UUID partyId = txn.getParty().getId();
+        int generated = 0;
+        for (MonitoringRule rule : activeRules()) {
+            if (TRANSACTIONAL_RULES.contains(rule.getCode())) {
+                generated += evaluateRule(rule, partyId);
+            }
+        }
+        log.debug("Monitoramento por evento: transacao {} gerou {} alerta(s)", transactionId, generated);
+        return generated;
+    }
+
+    @Transactional
+    public int evaluateAllActiveRules() {
+        List<MonitoringRule> rules = activeRules();
         int alertsGenerated = 0;
 
         for (MonitoringRule rule : rules) {
@@ -79,7 +109,16 @@ public class RuleEngineService {
 
     @Transactional
     public int evaluateRule(MonitoringRule rule) {
+        return evaluateRule(rule, null);
+    }
+
+    /** {@code partyScope} nulo = todas as partes (batch); preenchido = so aquela parte (evento). */
+    @Transactional
+    public int evaluateRule(MonitoringRule rule, UUID partyScope) {
         RuleParams p = new RuleParams(rule.getParameters());
+        if (partyScope != null && !TRANSACTIONAL_RULES.contains(rule.getCode())) {
+            return 0;
+        }
         return switch (rule.getCode()) {
             case "PEP_MATCH" -> evaluateScreeningMatch(rule, "Match PEP identificado",
                     "identificada em lista PEP", r -> r.getListCode().contains("PEP"));
@@ -87,17 +126,17 @@ public class RuleEngineService {
                     "identificada em lista de sanções", r -> r.getListCode().contains("SANCTION")
                             || r.getListCode().contains("OFAC") || r.getListCode().contains("UN_")
                             || r.getListCode().contains("CSNU"));
-            case "TXN_HIGH_VALUE" -> evaluateHighValue(rule, p);
-            case "TXN_VELOCITY" -> evaluateVelocity(rule, p);
-            case "STRUCTURING" -> evaluateStructuring(rule, p);
-            case "UNUSUAL_PATTERN" -> evaluateUnusualPattern(rule, p);
+            case "TXN_HIGH_VALUE" -> evaluateHighValue(rule, p, partyScope);
+            case "TXN_VELOCITY" -> evaluateVelocity(rule, p, partyScope);
+            case "STRUCTURING" -> evaluateStructuring(rule, p, partyScope);
+            case "UNUSUAL_PATTERN" -> evaluateUnusualPattern(rule, p, partyScope);
             case "WATCHLIST_MATCH" -> evaluateWatchlist(rule);
             case "CASH_50K" -> evaluateCash(p);
-            case "PEP_TRANSACTION" -> evaluatePepTransaction(rule, p);
-            case "PASS_THROUGH" -> evaluatePassThrough(rule, p);
-            case "ROUND_AMOUNTS" -> evaluateRoundAmounts(rule, p);
-            case "HIGH_RISK_JURISDICTION" -> evaluateHighRiskJurisdiction(rule, p);
-            case "PROFILE_INCOMPATIBLE" -> evaluateProfileIncompatible(rule, p);
+            case "PEP_TRANSACTION" -> evaluatePepTransaction(rule, p, partyScope);
+            case "PASS_THROUGH" -> evaluatePassThrough(rule, p, partyScope);
+            case "ROUND_AMOUNTS" -> evaluateRoundAmounts(rule, p, partyScope);
+            case "HIGH_RISK_JURISDICTION" -> evaluateHighRiskJurisdiction(rule, p, partyScope);
+            case "PROFILE_INCOMPATIBLE" -> evaluateProfileIncompatible(rule, p, partyScope);
             default -> 0;
         };
     }
@@ -147,7 +186,7 @@ public class RuleEngineService {
 
     // ------------------------------------------------------------------ transacionais
 
-    private int evaluateHighValue(MonitoringRule rule, RuleParams p) {
+    private int evaluateHighValue(MonitoringRule rule, RuleParams p, UUID scope) {
         BigDecimal threshold = p.decimal("threshold_brl",
                 rule.getThresholdValue() != null ? rule.getThresholdValue() : new BigDecimal("50000"));
         int days = p.integer("window_days",
@@ -155,7 +194,7 @@ public class RuleEngineService {
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
 
         int generated = 0;
-        for (var e : groupByParty(transactionRepository.findAtLeastSince(threshold, since)).entrySet()) {
+        for (var e : groupByParty(transactionRepository.findAtLeastSince(threshold, since, scope)).entrySet()) {
             List<Transaction> txns = e.getValue();
             Party party = txns.get(0).getParty();
             Map<String, Object> observed = new LinkedHashMap<>();
@@ -170,12 +209,12 @@ public class RuleEngineService {
         return generated;
     }
 
-    private int evaluateVelocity(MonitoringRule rule, RuleParams p) {
+    private int evaluateVelocity(MonitoringRule rule, RuleParams p, UUID scope) {
         int maxCount = p.integer("max_count", 10);
         int hours = p.integer("window_hours", 24);
         Instant since = Instant.now().minus(hours, ChronoUnit.HOURS);
 
-        List<Object[]> rows = transactionRepository.countByPartySinceHaving(since, maxCount);
+        List<Object[]> rows = transactionRepository.countByPartySinceHaving(since, maxCount, scope);
         if (rows.isEmpty()) return 0;
         Map<UUID, Long> counts = new HashMap<>();
         for (Object[] r : rows) counts.put((UUID) r[0], ((Number) r[1]).longValue());
@@ -199,7 +238,7 @@ public class RuleEngineService {
         return generated;
     }
 
-    private int evaluateStructuring(MonitoringRule rule, RuleParams p) {
+    private int evaluateStructuring(MonitoringRule rule, RuleParams p, UUID scope) {
         BigDecimal threshold = p.decimal("threshold_brl", new BigDecimal("10000"));
         BigDecimal bandPct = p.decimal("band_pct", new BigDecimal("20"));
         int minOccurrences = p.integer("min_occurrences", 3);
@@ -208,7 +247,7 @@ public class RuleEngineService {
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
 
         int generated = 0;
-        for (var e : groupByParty(transactionRepository.findInBandSince(lower, threshold, since)).entrySet()) {
+        for (var e : groupByParty(transactionRepository.findInBandSince(lower, threshold, since, scope)).entrySet()) {
             List<Transaction> txns = e.getValue();
             if (txns.size() < minOccurrences) continue;
             Party party = txns.get(0).getParty();
@@ -226,7 +265,7 @@ public class RuleEngineService {
         return generated;
     }
 
-    private int evaluateUnusualPattern(MonitoringRule rule, RuleParams p) {
+    private int evaluateUnusualPattern(MonitoringRule rule, RuleParams p, UUID scope) {
         BigDecimal multiplier = p.decimal("deviation_multiplier", new BigDecimal("5"));
         int minTxns = p.integer("min_transactions", 5);
         int lookbackDays = p.integer("window_days", 30);
@@ -234,12 +273,12 @@ public class RuleEngineService {
         Instant now = Instant.now();
 
         Map<UUID, BigDecimal> avg = new HashMap<>();
-        for (Object[] r : transactionRepository.averageByParty(now.minus(Math.max(baselineDays, lookbackDays), ChronoUnit.DAYS), minTxns)) {
+        for (Object[] r : transactionRepository.averageByParty(now.minus(Math.max(baselineDays, lookbackDays), ChronoUnit.DAYS), minTxns, scope)) {
             avg.put((UUID) r[0], new BigDecimal(r[2].toString()).setScale(2, RoundingMode.HALF_UP));
         }
         if (avg.isEmpty()) return 0;
         BigDecimal globalMin = avg.values().stream().min(Comparator.naturalOrder()).get().multiply(multiplier);
-        List<Transaction> candidates = transactionRepository.findAtLeastSince(globalMin, now.minus(lookbackDays, ChronoUnit.DAYS));
+        List<Transaction> candidates = transactionRepository.findAtLeastSince(globalMin, now.minus(lookbackDays, ChronoUnit.DAYS), scope);
 
         int generated = 0;
         for (var e : groupByParty(candidates).entrySet()) {
@@ -261,14 +300,14 @@ public class RuleEngineService {
         return generated;
     }
 
-    private int evaluatePepTransaction(MonitoringRule rule, RuleParams p) {
+    private int evaluatePepTransaction(MonitoringRule rule, RuleParams p, UUID scope) {
         BigDecimal threshold = p.decimal("threshold_brl", new BigDecimal("10000"));
         int days = p.integer("window_days", 30);
         boolean includeRelated = p.bool("include_related", true);
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
 
         int generated = 0;
-        for (var e : groupByParty(transactionRepository.findPepTransactionsSince(threshold, since)).entrySet()) {
+        for (var e : groupByParty(transactionRepository.findPepTransactionsSince(threshold, since, scope)).entrySet()) {
             List<Transaction> txns = e.getValue();
             Party party = txns.get(0).getParty();
             if (!includeRelated && !"ACTIVE".equals(party.getPepStatus())) continue;
@@ -283,14 +322,14 @@ public class RuleEngineService {
         return generated;
     }
 
-    private int evaluatePassThrough(MonitoringRule rule, RuleParams p) {
+    private int evaluatePassThrough(MonitoringRule rule, RuleParams p, UUID scope) {
         int windowHours = p.integer("window_hours", 48);
         BigDecimal ratio = p.decimal("min_out_in_ratio", new BigDecimal("0.90"));
         BigDecimal minAmount = p.decimal("min_amount_brl", new BigDecimal("20000"));
         int minCounterparties = p.integer("min_distinct_counterparties", 1);
         Instant since = Instant.now().minus(p.integer("lookback_days", 7), ChronoUnit.DAYS);
 
-        List<UUID> candidates = transactionRepository.findPartyIdsWithInflowSince(minAmount, since);
+        List<UUID> candidates = transactionRepository.findPartyIdsWithInflowSince(minAmount, since, scope);
         if (candidates.isEmpty()) return 0;
 
         int generated = 0;
@@ -330,7 +369,7 @@ public class RuleEngineService {
         return generated;
     }
 
-    private int evaluateRoundAmounts(MonitoringRule rule, RuleParams p) {
+    private int evaluateRoundAmounts(MonitoringRule rule, RuleParams p, UUID scope) {
         BigDecimal minAmount = p.decimal("min_amount_brl", new BigDecimal("5000"));
         BigDecimal multiple = p.decimal("round_multiple", new BigDecimal("1000"));
         int minOccurrences = p.integer("min_occurrences", 3);
@@ -343,7 +382,7 @@ public class RuleEngineService {
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
 
         int generated = 0;
-        for (var e : groupByParty(transactionRepository.findAtLeastSince(queryMin, since)).entrySet()) {
+        for (var e : groupByParty(transactionRepository.findAtLeastSince(queryMin, since, scope)).entrySet()) {
             List<Transaction> round = e.getValue().stream().filter(t -> {
                 BigDecimal a = brl(t);
                 boolean multipleHit = a.compareTo(minAmount) >= 0 && a.remainder(multiple).signum() == 0;
@@ -363,7 +402,7 @@ public class RuleEngineService {
         return generated;
     }
 
-    private int evaluateHighRiskJurisdiction(MonitoringRule rule, RuleParams p) {
+    private int evaluateHighRiskJurisdiction(MonitoringRule rule, RuleParams p, UUID scope) {
         List<String> sources = p.strings("sources", List.of("GAFI_BLACK", "GAFI_GREY", "INTERNAL", "TAX_HAVEN"));
         List<String> fields = p.strings("check_fields",
                 List.of("origin_country", "destination_country", "counterparty_country"));
@@ -377,7 +416,7 @@ public class RuleEngineService {
         if (byCountry.isEmpty()) return 0;
 
         int generated = 0;
-        for (var e : groupByParty(transactionRepository.findByCountriesSince(byCountry.keySet(), minAmount, since)).entrySet()) {
+        for (var e : groupByParty(transactionRepository.findByCountriesSince(byCountry.keySet(), minAmount, since, scope)).entrySet()) {
             List<Transaction> hits = new ArrayList<>();
             List<Map<String, Object>> matches = new ArrayList<>();
             for (Transaction t : e.getValue()) {
@@ -418,7 +457,7 @@ public class RuleEngineService {
         return generated;
     }
 
-    private int evaluateProfileIncompatible(MonitoringRule rule, RuleParams p) {
+    private int evaluateProfileIncompatible(MonitoringRule rule, RuleParams p, UUID scope) {
         BigDecimal incomeMultiplier = p.decimal("income_multiplier", new BigDecimal("3.0"));
         BigDecimal revenueMultiplier = p.decimal("revenue_multiplier", new BigDecimal("1.5"));
         int days = p.integer("window_days", 30);
@@ -426,7 +465,7 @@ public class RuleEngineService {
         boolean useExpected = p.bool("use_expected_monthly_volume", true);
         Instant since = Instant.now().minus(days, ChronoUnit.DAYS);
 
-        List<Object[]> rows = transactionRepository.volumeByParty(since, minAmount);
+        List<Object[]> rows = transactionRepository.volumeByParty(since, minAmount, scope);
         if (rows.isEmpty()) return 0;
         Map<UUID, BigDecimal> volume = new HashMap<>();
         for (Object[] r : rows) volume.put((UUID) r[0], new BigDecimal(r[1].toString()));

@@ -1,0 +1,91 @@
+# Web (React + Vite + TS): typecheck, lint, testes, build, npm audit e SBOM CycloneDX.
+# Check obrigatório na proteção de branch: "web-checks".
+name: web
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cactusguard-web/**"
+      - ".github/workflows/web.yml"
+  # Sem `paths` em PR de propósito: ver _changes.yml (check obrigatório não pode ficar pendente).
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
+
+defaults:
+  run:
+    working-directory: cactusguard-web
+
+env:
+  # Versão fixa da ferramenta de SBOM (não está no package.json para não acoplar ao build do app)
+  CYCLONEDX_NPM_VERSION: "6.0.1"
+
+jobs:
+  changes:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_changes.yml
+    with:
+      pattern: '^(cactusguard-web/|\.github/workflows/(web|_changes)\.yml$)'
+
+  checks:
+    name: web-checks
+    needs: changes
+    if: ${{ needs.changes.outputs.changed == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: cactusguard-web/package-lock.json
+
+      # --ignore-scripts: nenhum postinstall de dependência executa no CI (cadeia de suprimentos)
+      - name: npm ci
+        run: npm ci --ignore-scripts --no-fund
+
+      # Política: falha com vulnerabilidade HIGH/CRITICAL em qualquer dependência (prod ou dev).
+      # Moderate/low aparecem no resumo, sem bloquear (tratadas via Dependabot).
+      - name: npm audit (bloqueia high/critical)
+        run: |
+          npm audit --audit-level=moderate || true
+          npm audit --audit-level=high
+
+      - name: typecheck
+        run: npm run typecheck
+
+      - name: lint
+        run: npm run lint
+
+      - name: test
+        run: npm test -- --run
+
+      - name: build
+        run: npm run build
+
+      - name: SBOM CycloneDX (dependências de produção)
+        run: >
+          npx --yes "@cyclonedx/cyclonedx-npm@${CYCLONEDX_NPM_VERSION}"
+          --omit dev --spec-version 1.6 --output-format JSON
+          --output-file sbom-web.cdx.json
+
+      - name: Publicar SBOM
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: web-sbom-cyclonedx
+          path: cactusguard-web/sbom-web.cdx.json
+          retention-days: 90
+          if-no-files-found: error

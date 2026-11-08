@@ -15,6 +15,7 @@ import java.time.Instant;
 
 @Slf4j
 @Component
+@org.springframework.context.annotation.Profile("!prod")
 @Order(2)
 @RequiredArgsConstructor
 public class SampleDataSeeder implements CommandLineRunner {
@@ -22,8 +23,13 @@ public class SampleDataSeeder implements CommandLineRunner {
     private final PartyRepository partyRepository;
     private final TransactionRepository transactionRepository;
 
+    /** Dados de exemplo ficam sempre no tenant "default" (nunca em producao: @Profile("!prod")). */
     @Override
     public void run(String... args) {
+        br.com.cactus.guard.tenant.TenantContext.runAs(br.com.cactus.guard.tenant.TenantContext.DEFAULT_TENANT_ID, this::seed);
+    }
+
+    private void seed() {
         if (partyRepository.count() > 0) return;
 
         log.info("Seeding sample data...");

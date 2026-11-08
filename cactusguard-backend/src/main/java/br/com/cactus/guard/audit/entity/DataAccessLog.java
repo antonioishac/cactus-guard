@@ -13,7 +13,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DataAccessLog {
+public class DataAccessLog extends br.com.cactus.guard.tenant.TenantScoped {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

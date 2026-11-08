@@ -9,6 +9,9 @@ import br.com.cactus.guard.transaction.dto.TransactionResponse;
 import br.com.cactus.guard.transaction.entity.Transaction;
 import br.com.cactus.guard.audit.service.DataAccessService;
 import br.com.cactus.guard.common.exception.BusinessException;
+import br.com.cactus.guard.event.dto.DomainEventType;
+import br.com.cactus.guard.event.service.DomainEventPublisher;
+import br.com.cactus.guard.event.service.EventPayloads;
 import br.com.cactus.guard.common.util.DataMasker;
 import br.com.cactus.guard.common.util.DocumentHash;
 import br.com.cactus.guard.siscoaf.service.CashCommunicationService;
@@ -30,6 +33,7 @@ public class TransactionService {
     private final DataAccessService dataAccessService;
     private final CashCommunicationService cashCommunication;
     private final AssetFreezeGuard assetFreezeGuard;
+    private final DomainEventPublisher events;
 
     @Transactional
     public TransactionResponse create(TransactionRequest request) {
@@ -80,6 +84,8 @@ public class TransactionService {
         txn = transactionRepository.save(txn);
         // Excecao legal: especie >= limiar gera COE sem decisao de suspeita (auditada)
         cashCommunication.evaluate(txn);
+        // Evento na mesma transacao (outbox): nenhum evento se perde mesmo com o Kafka fora do ar
+        events.publish(DomainEventType.TRANSACTION_RECEIVED, txn.getId(), EventPayloads.transactionReceived(txn));
         return toResponse(txn);
     }
 

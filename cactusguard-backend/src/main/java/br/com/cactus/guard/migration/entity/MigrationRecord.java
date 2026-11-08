@@ -16,7 +16,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MigrationRecord {
+public class MigrationRecord extends br.com.cactus.guard.tenant.TenantScoped {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { assumeAlert, escalateAlert, getAlert, listAlerts, markFalsePositive } from '@/api/alerts'
-import { createCaseFromAlert } from '@/api/cases'
+import { addAlertComment, assumeAlert, escalateAlert, getAlert, listAlertComments, listAlerts, markFalsePositive } from '@/api/alerts'
+import { createCase } from '@/api/cases'
 import type { AlertFilters, FalsePositiveRequest, PageParams, UUID } from '@/api/types'
 
 export const useAlerts = (filters: AlertFilters, paging: PageParams) =>
@@ -28,4 +28,20 @@ export const useEscalateAlert = () =>
   useAlertAction((v: { id: UUID; justification: string }) => escalateAlert(v.id, { justification: v.justification }), 'Alerta escalado.')
 export const useFalsePositive = () =>
   useAlertAction((v: { id: UUID } & FalsePositiveRequest) => markFalsePositive(v.id, { reason: v.reason, justification: v.justification }), 'Alerta marcado como falso positivo.')
-export const useOpenCase = () => useAlertAction((alertId: UUID) => createCaseFromAlert(alertId), 'Case aberto. Prazo de análise iniciado.')
+export const useOpenCase = () =>
+  useAlertAction((v: { alertId: UUID; justification: string }) => createCase(v), 'Case aberto. Prazo de análise iniciado.')
+
+export const useAlertComments = (id: UUID | undefined) =>
+  useQuery({ queryKey: ['alerts', id, 'comments'], queryFn: () => listAlertComments(id!), enabled: !!id })
+
+export const useAddAlertComment = (id: UUID) => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (text: string) => addAlertComment(id, text),
+    meta: { successMessage: 'Comentário adicionado.' },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['alerts', id, 'comments'] })
+      void qc.invalidateQueries({ queryKey: ['alerts', 'detail', id] })
+    },
+  })
+}

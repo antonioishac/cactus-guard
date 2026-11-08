@@ -11,7 +11,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "test": "vitest",
-    "format": "prettier --write src"
+    "format": "prettier --write src",
+    "api:types": "node scripts/gen-api-types.mjs",
+    "api:types:check": "node scripts/gen-api-types.mjs --check"
   },
   "dependencies": {
     "@hookform/resolvers": "^7.0.3",
@@ -42,6 +44,7 @@
     "globals": "^17.14.0",
     "jsdom": "^29.1.1",
     "msw": "^3.0.4",
+    "openapi-typescript": "^7.13.0",
     "prettier": "^3.9.10",
     "tailwindcss": "^4.3.5",
     "typescript": "^6.0.3",
@@ -53,5 +56,10 @@
     "workerDirectory": [
       "public"
     ]
+  },
+  "overrides": {
+    "openapi-typescript": {
+      "typescript": "$typescript"
+    }
   }
 }

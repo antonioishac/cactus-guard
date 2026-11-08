@@ -10,6 +10,7 @@ import br.com.cactus.guard.rule.dto.MonitoringRuleResponse;
 import br.com.cactus.guard.rule.dto.RuleVersionResponse;
 import br.com.cactus.guard.rule.entity.MonitoringRule;
 import br.com.cactus.guard.rule.entity.MonitoringRuleVersion;
+import br.com.cactus.guard.rule.entity.MonitoringRuleTemplate;
 import br.com.cactus.guard.rule.repository.MonitoringRuleRepository;
 import br.com.cactus.guard.rule.repository.MonitoringRuleVersionRepository;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,7 @@ public class MonitoringRuleService {
 
     private final MonitoringRuleRepository ruleRepository;
     private final MonitoringRuleVersionRepository versionRepository;
+    private final br.com.cactus.guard.rule.repository.MonitoringRuleTemplateRepository templateRepository;
     private final AuditService auditService;
     private final CurrentUserService currentUser;
 
@@ -238,6 +240,52 @@ public class MonitoringRuleService {
         MonitoringRule rule = find(code);
         return versionRepository.findEffectiveAt(rule.getId(), at).stream().findFirst()
                 .map(this::toVersionResponse);
+    }
+
+    /**
+     * Provisionamento de tenant: copia o catalogo global de regras-modelo para o tenant corrente, com a versao 1
+     * (snapshot) de cada regra. Regras PENDING_APPROVAL continuam exigindo aprovacao de quatro olhos no tenant.
+     * Idempotente (pula codigos ja existentes).
+     */
+    @Transactional
+    @CacheEvict(value = "rules", allEntries = true)
+    public int provisionFromTemplates() {
+        Instant now = Instant.now();
+        int copied = 0;
+        for (MonitoringRuleTemplate t : templateRepository.findAllByOrderByCodeAsc()) {
+            if (ruleRepository.findByCode(t.getCode()).isPresent()) {
+                continue;
+            }
+            MonitoringRule r = new MonitoringRule();
+            r.setCode(t.getCode());
+            r.setName(t.getName());
+            r.setDescription(t.getDescription());
+            r.setCategory(t.getCategory());
+            r.setSeverity(t.getSeverity());
+            r.setActive(t.isActive());
+            r.setStatus(t.getStatus());
+            r.setConditionExpression(t.getConditionExpression());
+            r.setThresholdValue(t.getThresholdValue());
+            r.setThresholdPeriodDays(t.getThresholdPeriodDays());
+            r.setParameters(t.getParameters());
+            r.setCarta4001Reference(t.getCarta4001Reference());
+            r.setAppliesToRiskLevels(t.getAppliesToRiskLevels());
+            r.setAutoCommunication(t.isAutoCommunication());
+            r.setVersion(1);
+            if ("ACTIVE".equals(t.getStatus())) {
+                r.setEffectiveFrom(now);
+            }
+            r = ruleRepository.save(r);
+            versionRepository.save(MonitoringRuleVersion.builder()
+                    .rule(r)
+                    .version(1)
+                    .snapshot(state(r))
+                    .changeReason("Regra-modelo da plataforma (provisionamento do tenant)")
+                    .effectiveFrom(r.getEffectiveFrom())
+                    .build());
+            copied++;
+        }
+        return copied;
     }
 
     // ------------------------------------------------------------------ internos

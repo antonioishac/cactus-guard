@@ -12,6 +12,14 @@ security:
     allowed-origins: http://localhost:3000,http://localhost:5173
   hsts:
     enabled: false
+# dev NUNCA chama provedores reais (COAF, screening, KYC): usa os Mock*Provider.
+integrations:
+  screening:
+    provider: mock
+  siscoaf:
+    provider: mock
+  kyc:
+    provider: mock
 spring:
   flyway:
     # dev: migrations oficiais + usuários de desenvolvimento (db/dev/R__dev_users.sql)

@@ -1,5 +1,8 @@
 package br.com.cactus.guard.siscoaf.service;
 
+import br.com.cactus.guard.event.dto.DomainEventType;
+import br.com.cactus.guard.event.service.DomainEventPublisher;
+import br.com.cactus.guard.event.service.EventPayloads;
 import br.com.cactus.guard.case_.entity.Case;
 import br.com.cactus.guard.siscoaf.entity.SiscoafCommunication;
 import br.com.cactus.guard.siscoaf.repository.SiscoafCommunicationRepository;
@@ -22,6 +25,7 @@ import java.util.Map;
 public class SiscoafDraftService {
 
     private final SiscoafCommunicationRepository repository;
+    private final DomainEventPublisher events;
 
     @Transactional
     public SiscoafCommunication createCosDraft(Case c, Instant decidedAt, Instant deadline) {
@@ -62,6 +66,8 @@ public class SiscoafDraftService {
                 .indicatorCodes(c.getIndicatorCodes())
                 .createdBy(c.getApprovedBy() != null ? c.getApprovedBy() : c.getDecidedBy())
                 .build();
-        return repository.save(comm);
+        comm = repository.save(comm);
+        events.publish(DomainEventType.COMMUNICATION_CREATED, comm.getId(), EventPayloads.communication(comm));
+        return comm;
     }
 }

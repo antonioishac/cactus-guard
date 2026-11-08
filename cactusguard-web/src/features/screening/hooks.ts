@@ -7,7 +7,7 @@ export const useHitQueue = (status: string, paging: PageParams) =>
   useQuery({ queryKey: ['screening', 'queue', status, paging], queryFn: () => listScreeningByStatus(status, paging), placeholderData: keepPreviousData })
 
 export const useScreeningLists = () =>
-  useQuery({ queryKey: ['screening', 'lists'], queryFn: listScreeningLists, retry: false })
+  useQuery({ queryKey: ['screening', 'lists'], queryFn: listScreeningLists })
 
 export const useWatchlist = () => useQuery({ queryKey: ['watchlist'], queryFn: listWatchlist, retry: false })
 
@@ -29,7 +29,7 @@ export const useRunScreening = () =>
 /** Confirmar hit pode acionar bloqueio CSNU e recálculo de risco: invalida a ficha da parte também. */
 export const useReviewHit = () =>
   useInvalidating(
-    (v: { id: UUID; status: 'CONFIRMED' | 'FALSE_POSITIVE'; justification: string }) => reviewScreening(v.id, v.status, v.justification),
+    (v: { id: UUID; status: 'CONFIRMED' | 'FALSE_POSITIVE'; justification: string }) => reviewScreening(v.id, { status: v.status, justification: v.justification }),
     'Revisão registrada.',
     [['party'], ['parties'], ['alerts'], ['dashboard']],
   )

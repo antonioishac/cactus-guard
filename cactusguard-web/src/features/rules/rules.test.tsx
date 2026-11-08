@@ -1,15 +1,12 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import type { RuleVersion } from '@/api/types'
 import { diffObjects } from '@/lib/diff'
-import { db2b, resetDb2b } from '@/mocks/handlers/db2b'
-import { preload2B } from '@/test/preload2b'
+import { db2b } from '@/mocks/handlers/db2b'
 import { loginAs, renderApp } from '@/test/utils'
 import { fieldsToParams, paramsToFields, validateFields } from './params'
 
-beforeAll(() => preload2B(), 30_000)
-beforeEach(() => resetDb2b())
 
 describe('diff de versões', () => {
   it('lista adicionados, removidos e alterados em parâmetros aninhados', () => {

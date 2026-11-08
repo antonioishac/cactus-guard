@@ -1,6 +1,6 @@
 import type { ISODateTime, UUID } from './common'
 
-/** ReportDefinition (entity serializada). */
+/** ReportDefinition. */
 export interface ReportDefinition {
   id?: UUID
   code: string
@@ -24,8 +24,8 @@ export interface ReportJob {
   downloadable: boolean
   createdAt: ISODateTime
   completedAt: ISODateTime | null
-  /** não existe hoje: mensagem de falha da geração */
-  errorMessage?: string | null
+  /** mensagem genérica quando FAILED (o detalhe técnico fica só no log do servidor) */
+  errorMessage: string | null
 }
 
 export interface ReportGenerateRequest {

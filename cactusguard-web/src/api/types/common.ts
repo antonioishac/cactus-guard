@@ -22,12 +22,30 @@ export interface PageParams {
   sort?: string
 }
 
-/** Corpo de erro do GlobalExceptionHandler; `code` e `traceId` ainda não existem no backend. */
+/** Códigos estáveis do contrato de erro global (spec 033). `BUSINESS_RULE` pode ser especializado (ex.: DOCUMENT_IMMUTABLE). */
+export type ApiErrorCode =
+  | 'VALIDATION_ERROR'
+  | 'UNAUTHORIZED'
+  | 'FORBIDDEN'
+  | 'NOT_FOUND'
+  | 'METHOD_NOT_ALLOWED'
+  | 'BUSINESS_RULE'
+  | 'PAYLOAD_TOO_LARGE'
+  | 'RATE_LIMITED'
+  | 'INTERNAL_ERROR'
+
+export interface FieldError {
+  field: string
+  message: string
+}
+
+/** Corpo de erro do GlobalExceptionHandler: `{timestamp,status,error,message,code,traceId,fieldErrors?}`. */
 export interface ApiErrorBody {
   timestamp?: ISODateTime
   status?: number
   error?: string
   message?: string
-  code?: string
+  code?: ApiErrorCode | string
   traceId?: string
+  fieldErrors?: FieldError[]
 }

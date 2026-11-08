@@ -25,7 +25,8 @@ public interface PartyRepository extends JpaRepository<Party, UUID>, JpaSpecific
 
     Page<Party> findByIdIn(Collection<UUID> ids, Pageable pageable);
 
-    @Query(value = "SELECT * FROM parties WHERE search_vector @@ plainto_tsquery('portuguese', :query) ORDER BY ts_rank(search_vector, plainto_tsquery('portuguese', :query)) DESC",
+    // Nativa: o Hibernate NAO injeta @TenantId aqui; o filtro de tenant e explicito (e o RLS repete no banco).
+    @Query(value = "SELECT * FROM parties WHERE tenant_id = :#{T(br.com.cactus.guard.tenant.TenantContext).currentOrNone()} AND search_vector @@ plainto_tsquery('portuguese', :query) ORDER BY ts_rank(search_vector, plainto_tsquery('portuguese', :query)) DESC",
            nativeQuery = true)
     Page<Party> searchFullText(@Param("query") String query, Pageable pageable);
 
@@ -33,7 +34,7 @@ public interface PartyRepository extends JpaRepository<Party, UUID>, JpaSpecific
      * Ids que casam com a busca full-text (tsvector + GIN), por relevancia, limitados. Usado por
      * GET /parties?q= combinado com os demais filtros (Specification) sem depender de ordenacao nativa.
      */
-    @Query(value = "SELECT id FROM parties WHERE search_vector @@ plainto_tsquery('portuguese', :query) "
+    @Query(value = "SELECT id FROM parties WHERE tenant_id = :#{T(br.com.cactus.guard.tenant.TenantContext).currentOrNone()} AND search_vector @@ plainto_tsquery('portuguese', :query) "
             + "ORDER BY ts_rank(search_vector, plainto_tsquery('portuguese', :query)) DESC LIMIT :max",
             nativeQuery = true)
     List<UUID> searchIdsFullText(@Param("query") String query, @Param("max") int max);

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Eye, EyeOff } from 'lucide-react'
 import { revealPartyField } from '@/api/parties'
+import { REVEAL_REASON_MAX, REVEAL_REASON_MIN } from '@/api/types'
 import type { PiiField, UUID } from '@/api/types'
 import { useAuthStore } from '@/stores/authStore'
 import { can } from '@/lib/permissions'
@@ -8,7 +9,6 @@ import { JustificationDialog } from './JustificationDialog'
 import { toast } from '@/stores/toastStore'
 
 const REVEAL_MS = 30_000
-const REVEAL_MIN_REASON = 10
 
 interface Props {
   /** valor já mascarado, como veio da API */
@@ -53,13 +53,14 @@ export function MaskedValue({ value, partyId, field, label }: Props) {
         <JustificationDialog
           open={asking}
           title={`Revelar ${label}`}
-          description="O acesso ao dado completo é registrado (LGPD). Informe o motivo."
+          description="O acesso ao dado completo é registrado (LGPD) com o motivo informado (10 a 500 caracteres). O valor fica visível por 30 s e não é guardado."
           confirmLabel="Revelar"
-          minLength={REVEAL_MIN_REASON}
+          minLength={REVEAL_REASON_MIN}
+          maxLength={REVEAL_REASON_MAX}
           onCancel={() => setAsking(false)}
           onConfirm={async ({ justification }) => {
             const res = await revealPartyField(partyId, { field, reason: justification })
-            setRevealed(res.value)
+            setRevealed(res.value ?? res.values[field] ?? null)
             setAsking(false)
             toast.info('Acesso registrado. O dado será ocultado em 30 s.')
           }}

@@ -1,5 +1,8 @@
 package br.com.cactus.guard.case_.service;
 
+import br.com.cactus.guard.event.dto.DomainEventType;
+import br.com.cactus.guard.event.service.DomainEventPublisher;
+import br.com.cactus.guard.event.service.EventPayloads;
 import br.com.cactus.guard.common.audit.AuditPayload;
 import br.com.cactus.guard.alert.entity.Alert;
 import br.com.cactus.guard.alert.repository.AlertRepository;
@@ -66,6 +69,7 @@ public class CaseService {
     private final CaseNumberService caseNumberService;
     private final ApplicationEventPublisher eventPublisher;
     private final AlertHistoryRepository alertHistoryRepository;
+    private final DomainEventPublisher events;
 
     /** Selecao sem justificativa textual (alias legado POST /cases/from-alert/{id}). */
     @Transactional
@@ -213,7 +217,8 @@ public class CaseService {
         c = caseRepository.save(c);
         if ("PENDING_APPROVAL".equals(c.getStatus())) {
             eventPublisher.publishEvent(new CasePendingApprovalEvent(c.getId(),
-                    c.getDecidedBy() != null ? c.getDecidedBy().getId() : null));
+                    c.getDecidedBy() != null ? c.getDecidedBy().getId() : null,
+                    br.com.cactus.guard.tenant.TenantContext.require()));
         }
 
         if (user != null) {
@@ -221,6 +226,7 @@ public class CaseService {
                     "Decisão " + decision + " registrada no case", "CASE", c.getId());
         }
         AuditPayload.log(auditService, "CASE_DECIDED", "CASE", c.getId(), before, snapshot(c));
+        events.publish(DomainEventType.CASE_DECIDED, c.getId(), EventPayloads.caseEvent(c));
         return toResponse(c);
     }
 
@@ -270,6 +276,7 @@ public class CaseService {
             after.put("approvalComment", request.comment().trim());
         }
         AuditPayload.log(auditService, "CASE_APPROVED", "CASE", c.getId(), before, after);
+        events.publish(DomainEventType.CASE_APPROVED, c.getId(), EventPayloads.caseEvent(c));
         return toResponse(c);
     }
 
@@ -317,6 +324,8 @@ public class CaseService {
         after.put("rejectionJustification", just);
         after.put("rejectedBy", reviewer.getId().toString());
         AuditPayload.log(auditService, "CASE_APPROVAL_REJECTED", "CASE", c.getId(), before, after);
+        // payload sem a justificativa (texto livre pode conter PII); o decisor/rejeitor ficam no audit_log
+        events.publish(DomainEventType.CASE_APPROVAL_REJECTED, c.getId(), EventPayloads.caseEvent(c));
 
         notificationService.create(decider.getId(), "CASE_APPROVAL_REJECTED", "Aprovação rejeitada",
                 "A decisão proposta foi devolvida para análise", "CASE", c.getId());

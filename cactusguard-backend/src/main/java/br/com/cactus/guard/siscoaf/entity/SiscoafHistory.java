@@ -15,7 +15,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class SiscoafHistory {
+public class SiscoafHistory extends br.com.cactus.guard.tenant.TenantScoped {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

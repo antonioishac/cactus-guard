@@ -5,7 +5,7 @@ export type RuleStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'ACTIVE' | 'INACTIVE'
 export type ParamValue = string | number | boolean | null | ParamValue[] | { [k: string]: ParamValue }
 export type RuleParams = Record<string, ParamValue>
 
-/** MonitoringRuleResponse do backend. */
+/** MonitoringRuleResponse. Métricas (`alertsGenerated`, `falsePositiveRate`) cobrem os últimos 30 dias. */
 export interface MonitoringRule {
   id: UUID
   code: string
@@ -21,18 +21,22 @@ export interface MonitoringRule {
   effectiveTo: ISODateTime | null
   thresholdValue: number | null
   thresholdPeriodDays: number | null
-  /* ---- NÃO existem no DTO real (entity/spec); opcionais ---- */
-  carta4001Reference?: string | null
-  appliesToRiskLevels?: string[] | null
-  /** necessário para desabilitar "Aprovar" ao criador (quatro olhos) */
-  createdById?: UUID | null
-  createdByName?: string | null
-  /** métricas (spec 013) */
-  alertsGenerated?: number | null
-  falsePositiveRate?: number | null
+  createdById: UUID | null
+  createdByName: string | null
+  approvedById: UUID | null
+  approvedByName: string | null
+  approvedAt: ISODateTime | null
+  carta4001Reference: string | null
+  appliesToRiskLevels: string[] | null
+  autoCommunication: boolean
+  /** versão imutável vigente agora (GET /rules/{code}) */
+  activeVersion: number | null
+  alertsGenerated: number | null
+  /** falsos positivos / alertas encerrados; null se nenhum encerrado */
+  falsePositiveRate: number | null
 }
 
-/** RuleVersionResponse do backend. `snapshot` = estado da regra na versão (inclui `parameters`). */
+/** RuleVersionResponse. `snapshot` = estado da regra na versão (inclui `parameters`). */
 export interface RuleVersion {
   version: number
   snapshot: Record<string, unknown> | null
@@ -41,17 +45,29 @@ export interface RuleVersion {
   approvedAt: ISODateTime | null
   effectiveFrom: ISODateTime | null
   effectiveTo: ISODateTime | null
-  /** não existe no DTO real */
-  createdById?: UUID | null
-  createdByName?: string | null
-  approvedByName?: string | null
+  createdById: UUID | null
+  createdByName: string | null
+  approvedByName: string | null
 }
 
+/** GET /rules/{code}/metrics?from=&to= (padrão: últimos 30 dias). */
+export interface RuleMetrics {
+  code: string
+  from: ISODateTime
+  to: ISODateTime
+  alertsGenerated: number
+  alertsClosed: number
+  falsePositives: number
+  falsePositiveRate: number | null
+}
+
+/** `status` aceita vários (CSV) e prevalece sobre `includeInactive`. */
 export interface RuleFilters {
   status?: string
   category?: string
   severity?: string
   q?: string
+  includeInactive?: boolean
 }
 
 /** MonitoringRuleRequest. `reason` é obrigatório na edição (PUT). */

@@ -3,17 +3,8 @@ import type { RouteObject } from 'react-router'
 import AppLayout from '@/layouts/AppLayout'
 import { RequireAuth, RequireRole } from '@/features/auth/guards'
 import { LoginPage } from '@/features/auth/LoginPage'
-import { DashboardPage } from '@/features/dashboard/pages/DashboardPage'
-import { AlertListPage } from '@/features/alerts/pages/AlertListPage'
-import { AlertDetailPage } from '@/features/alerts/pages/AlertDetailPage'
-import { CaseListPage } from '@/features/cases/pages/CaseListPage'
-import { CaseDossierPage } from '@/features/cases/pages/CaseDossierPage'
-import { PartyListPage } from '@/features/parties/pages/PartyListPage'
-import { PartyDetailPage } from '@/features/parties/pages/PartyDetailPage'
-import { PartyFormPage } from '@/features/parties/pages/PartyFormPage'
-import { ScreeningPage } from '@/features/screening/pages/ScreeningPage'
-import { UsersPage } from '@/features/users/pages/UsersPage'
 import { ADMIN_ROLES, NAV_ITEMS } from './nav'
+import { lazyPage } from './lazyPage'
 import { routes2B } from './routes2b'
 import { NotFound, Unauthorized, UnderConstruction } from './statusPages'
 
@@ -34,37 +25,37 @@ export const routes: RouteObject[] = [
         element: <AppLayout />,
         handle: { crumb: 'Início' },
         children: [
-          { index: true, element: <DashboardPage /> },
+          { index: true, ...lazyPage(() => import('@/features/dashboard/pages/DashboardPage'), 'DashboardPage') },
           {
             path: 'alertas',
             handle: { crumb: 'Alertas' },
             children: [
-              { index: true, element: <AlertListPage /> },
-              { path: ':id', element: <AlertDetailPage />, handle: { crumb: 'Detalhe' } },
+              { index: true, ...lazyPage(() => import('@/features/alerts/pages/AlertListPage'), 'AlertListPage') },
+              { path: ':id', ...lazyPage(() => import('@/features/alerts/pages/AlertDetailPage'), 'AlertDetailPage'), handle: { crumb: 'Detalhe' } },
             ],
           },
           {
             path: 'casos',
             handle: { crumb: 'Casos' },
             children: [
-              { index: true, element: <CaseListPage /> },
-              { path: ':id', element: <CaseDossierPage />, handle: { crumb: 'Dossiê' } },
+              { index: true, ...lazyPage(() => import('@/features/cases/pages/CaseListPage'), 'CaseListPage') },
+              { path: ':id', ...lazyPage(() => import('@/features/cases/pages/CaseDossierPage'), 'CaseDossierPage'), handle: { crumb: 'Dossiê' } },
             ],
           },
           {
             path: 'partes',
             handle: { crumb: 'Partes (KYC/PEP)' },
             children: [
-              { index: true, element: <PartyListPage /> },
-              { path: 'nova', element: <PartyFormPage />, handle: { crumb: 'Nova parte' } },
-              { path: ':id', element: <PartyDetailPage />, handle: { crumb: 'Ficha 360º' } },
-              { path: ':id/editar', element: <PartyFormPage />, handle: { crumb: 'Editar' } },
+              { index: true, ...lazyPage(() => import('@/features/parties/pages/PartyListPage'), 'PartyListPage') },
+              { path: 'nova', ...lazyPage(() => import('@/features/parties/pages/PartyFormPage'), 'PartyFormPage'), handle: { crumb: 'Nova parte' } },
+              { path: ':id', ...lazyPage(() => import('@/features/parties/pages/PartyDetailPage'), 'PartyDetailPage'), handle: { crumb: 'Ficha 360º' } },
+              { path: ':id/editar', ...lazyPage(() => import('@/features/parties/pages/PartyFormPage'), 'PartyFormPage'), handle: { crumb: 'Editar' } },
             ],
           },
-          { path: 'screening', element: <ScreeningPage />, handle: { crumb: 'Screening' } },
+          { path: 'screening', ...lazyPage(() => import('@/features/screening/pages/ScreeningPage'), 'ScreeningPage'), handle: { crumb: 'Screening' } },
           {
             element: <RequireRole roles={ADMIN_ROLES} />,
-            children: [{ path: 'usuarios', element: <UsersPage />, handle: { crumb: 'Usuários' } }],
+            children: [{ path: 'usuarios', ...lazyPage(() => import('@/features/users/pages/UsersPage'), 'UsersPage'), handle: { crumb: 'Usuários' } }],
           },
           ...routes2B,
           ...placeholders,

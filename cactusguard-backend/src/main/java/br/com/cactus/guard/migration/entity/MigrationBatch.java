@@ -13,7 +13,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MigrationBatch {
+public class MigrationBatch extends br.com.cactus.guard.tenant.TenantScoped {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

@@ -54,12 +54,12 @@ describe('cliente HTTP: refresh automático em 401', () => {
     expect(sessionStorage.getItem('cg.rt')).toBeNull()
   })
 
-  it('normaliza erro do backend (mensagem, código e traceId)', async () => {
+  it('normaliza erro do contrato global (code, message, traceId, fieldErrors)', async () => {
     loginAs('u-analyst')
     server.use(
-      http.get('*/api/v1/alerts', () => HttpResponse.json({ status: 422, error: 'BUSINESS', message: 'Regra violada', traceId: 'abc123' }, { status: 422 })),
+      http.get('*/api/v1/alerts', () => HttpResponse.json({ status: 422, error: 'Unprocessable Content', code: 'DOCUMENT_IMMUTABLE', message: 'Regra violada', traceId: 'abc123', fieldErrors: [{ field: 'document', message: 'imutável' }] }, { status: 422 })),
     )
-    await expect(listAlerts({}, {})).rejects.toMatchObject({ status: 422, code: 'BUSINESS', message: 'Regra violada', traceId: 'abc123' })
+    await expect(listAlerts({}, {})).rejects.toMatchObject({ status: 422, code: 'DOCUMENT_IMMUTABLE', message: 'Regra violada', traceId: 'abc123', fieldErrors: [{ field: 'document', message: 'imutável' }] })
   })
 
   it('anexa o Bearer token em memória', async () => {

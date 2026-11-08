@@ -3,14 +3,15 @@ import { Card } from '@/components/ui/Layout'
 import { formatDate } from '@/lib/format'
 import { MiniTable } from '@/features/parties/components/PartySections'
 import { useScreeningLists } from '../hooks'
-import { FALLBACK_LISTS } from '../lists'
+import { ErrorState, Skeleton } from '@/components/ui/Feedback'
 
 export function ListsCatalog() {
   const q = useScreeningLists()
-  const data = q.data ?? FALLBACK_LISTS
+  const data = q.data ?? []
   return (
     <Card title="Listas utilizadas no screening">
-      {!q.data && <p className="mb-3 text-xs text-muted">Catálogo ilustrativo: a API ainda não expõe as listas ativas.</p>}
+      {q.isLoading && <Skeleton className="h-24 w-full" />}
+      {q.isError && <ErrorState error={q.error} onRetry={() => void q.refetch()} compact />}
       <MiniTable head={['Código', 'Lista', 'Tipo', 'Fonte', 'Atualizada em', 'Observação']}>
         {data.map((l) => (
           <tr key={l.code}>

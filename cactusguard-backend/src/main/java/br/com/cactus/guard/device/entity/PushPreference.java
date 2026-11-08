@@ -13,7 +13,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class PushPreference {
+public class PushPreference extends br.com.cactus.guard.tenant.TenantScoped {
 
     @Id
     @Column(name = "user_id")

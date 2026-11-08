@@ -1,11 +1,17 @@
 import { api } from './client'
-import { pageQuery } from './params'
-import type { AuditEntry, DataAccessEntry, Page, PageParams, UUID } from './types'
+import { cleanParams, pageQuery } from './params'
+import type { AuditEntry, AuditFilters, DataAccessEntry, Page, PageParams, UUID } from './types'
 
-/**
- * DIVERGÊNCIA: a trilha só pode ser consultada POR ENTIDADE (`/audit/entity/{tipo}/{id}`); não há busca
- * global por usuário/ação/período. A tela exige a entidade e aplica usuário/ação/período sobre a página recebida.
- */
+/** Trilha global paginada no servidor (padrão `createdAt,desc`). `from`/`to`: AAAA-MM-DD (America/Sao_Paulo). */
+export async function listAudit(filters: AuditFilters, paging: PageParams): Promise<Page<AuditEntry>> {
+  return (await api.get<Page<AuditEntry>>('/audit', { params: cleanParams({ ...filters, ...pageQuery(paging) }) })).data
+}
+
+/** Log LGPD de acesso a dados (mesmos filtros, sem `action`). */
+export async function listDataAccess(filters: Omit<AuditFilters, 'action'>, paging: PageParams): Promise<Page<DataAccessEntry>> {
+  return (await api.get<Page<DataAccessEntry>>('/data-access', { params: cleanParams({ ...filters, ...pageQuery(paging) }) })).data
+}
+
 export async function listAuditByEntity(entityType: string, entityId: UUID, paging: PageParams): Promise<Page<AuditEntry>> {
   return (await api.get<Page<AuditEntry>>(`/audit/entity/${encodeURIComponent(entityType)}/${entityId}`, { params: pageQuery(paging) })).data
 }

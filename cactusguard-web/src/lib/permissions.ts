@@ -12,6 +12,7 @@ export type Action =
   | 'case:decide'
   | 'case:escalate'
   | 'case:approve'
+  | 'case:reject'
   | 'case:note'
   | 'case:upload'
   | 'pii:reveal'
@@ -41,14 +42,16 @@ const MATRIX: Record<Action, Role[]> = {
   'case:decide': ANALYSTS,
   'case:escalate': ANALYSTS,
   'case:approve': ['SUPERVISOR'],
+  'case:reject': ['SUPERVISOR'],
   'case:note': ANALYSTS,
   'case:upload': ANALYSTS,
-  'pii:reveal': ANALYSTS,
+  // ADMIN não revela PII (403 no backend); AUDITOR revela
+  'pii:reveal': ['ANALYST', 'SUPERVISOR', 'AUDITOR'],
   'audit:read': ['AUDITOR', 'ADMIN', 'SUPERVISOR'],
   'party:write': ANALYSTS,
   'pep:mark': ANALYSTS,
   'pep:approve': ['SUPERVISOR'],
-  'risk:recalculate': ['SUPERVISOR', 'ADMIN'],
+  'risk:recalculate': ANALYSTS,
   'screening:run': ANALYSTS,
   'screening:review': ANALYSTS,
   'watchlist:write': ['SUPERVISOR'],

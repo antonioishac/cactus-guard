@@ -1,6 +1,6 @@
 import type { ISODateTime, UUID } from './common'
 
-/** Entity Notification serializada. */
+/** Notification (o backend ainda serializa a entity; usar só estes campos). */
 export interface AppNotification {
   id: UUID
   type: string

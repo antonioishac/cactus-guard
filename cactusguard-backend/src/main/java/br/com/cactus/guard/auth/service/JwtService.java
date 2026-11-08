@@ -16,6 +16,8 @@ import java.util.UUID;
 @Service
 public class JwtService {
 
+    public static final String TENANT_CLAIM = "tenant_id";
+
     @Value("${jwt.secret}")
     private String secret;
 
@@ -37,13 +39,14 @@ public class JwtService {
         return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
-    public String generateAccessToken(UUID userId, String username, List<String> roles) {
+    public String generateAccessToken(UUID userId, String username, List<String> roles, UUID tenantId) {
         return Jwts.builder()
                 .issuer(issuer)
                 .id(UUID.randomUUID().toString())
                 .subject(username)
                 .claim("userId", userId.toString())
                 .claim("roles", roles)
+                .claim(TENANT_CLAIM, tenantId.toString())
                 .issuedAt(new Date())
                 .expiration(new Date(System.currentTimeMillis() + accessTokenExpiration))
                 .signWith(getSigningKey())
@@ -73,6 +76,16 @@ public class JwtService {
             return true;
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    /** Claim tenant_id do token (vazio se ausente ou malformado). */
+    public java.util.Optional<UUID> extractTenantId(String token) {
+        try {
+            Object v = extractClaims(token).get(TENANT_CLAIM);
+            return v == null ? java.util.Optional.empty() : java.util.Optional.of(UUID.fromString(v.toString()));
+        } catch (Exception e) {
+            return java.util.Optional.empty();
         }
     }
 }

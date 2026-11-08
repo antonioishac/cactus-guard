@@ -21,7 +21,7 @@ Future<TestEnv> _boot(WidgetTester tester) async {
 
 Future<void> _login(WidgetTester tester, String user) async {
   await tester.enterText(find.byKey(const Key('login-username')), user);
-  await tester.enterText(find.byKey(const Key('login-password')), 'cactus123');
+  await tester.enterText(find.byKey(const Key('login-password')), 'dev12345');
   await tester.tap(find.byKey(const Key('login-submit')));
   await tester.pumpAndSettle();
 }

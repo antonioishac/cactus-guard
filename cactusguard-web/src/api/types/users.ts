@@ -11,7 +11,7 @@ export interface UserAccount {
   createdAt: ISODateTime
 }
 
-/** UserCreateRequest do backend (senha com 10 a 128 caracteres). */
+/** UserCreateRequest (senha com 10 a 128 caracteres). */
 export interface UserCreateRequest {
   username: string
   email: string
@@ -20,9 +20,24 @@ export interface UserCreateRequest {
   roles: string[]
 }
 
-/** PROPOSTO (o backend só tem criar/listar/detalhe/desativar): edição, reativação e troca de roles. */
+/** PUT /users/{id}: username é imutável; e-mail duplicado => 422 EMAIL_IN_USE. */
 export interface UserUpdateRequest {
   name: string
   email: string
   roles: string[]
+}
+
+/** POST /users/{id}/reset-password: `newPassword` opcional (10–128). */
+export interface PasswordResetRequest {
+  newPassword?: string
+}
+
+/**
+ * `temporaryPassword` só vem quando o servidor gera a senha, UMA única vez (no-store). Nunca persistir:
+ * exibir com aviso e cópia, e descartar ao fechar.
+ */
+export interface PasswordResetResponse {
+  userId: UUID
+  temporaryPassword: string | null
+  refreshTokensRevoked: boolean
 }

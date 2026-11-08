@@ -37,6 +37,7 @@ class RedisCacheSerializerTest {
         when(repository.findByActiveTrue()).thenReturn(List.of(rule));
         List<MonitoringRuleResponse> cached = new MonitoringRuleService(repository,
                 mock(br.com.cactus.guard.rule.repository.MonitoringRuleVersionRepository.class),
+                mock(br.com.cactus.guard.rule.repository.MonitoringRuleTemplateRepository.class),
                 mock(br.com.cactus.guard.audit.service.AuditService.class),
                 mock(br.com.cactus.guard.common.security.CurrentUserService.class)).findAllActive();
 

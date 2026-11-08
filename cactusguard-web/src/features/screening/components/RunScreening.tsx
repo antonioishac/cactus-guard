@@ -9,13 +9,12 @@ import { useParties } from '@/features/parties/hooks'
 import { maskDocument } from '@/lib/format'
 import { HitReviewButtons, HitStatusBadge } from './HitReview'
 import { useRunScreening, useScreeningLists } from '../hooks'
-import { FALLBACK_LISTS } from '../lists'
 
 /** Execução manual: escolhe a parte (busca por nome/documento, só em memória), as listas e executa. */
 export function RunScreening() {
   const { can } = useAuth()
   const lists = useScreeningLists()
-  const catalog = lists.data?.filter((l) => l.active) ?? FALLBACK_LISTS
+  const catalog = lists.data?.filter((l) => l.active) ?? []
   const [term, setTerm] = useState('')
   const [submitted, setSubmitted] = useState('')
   const [party, setParty] = useState<Party | null>(null)

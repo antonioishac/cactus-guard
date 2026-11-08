@@ -1,52 +1,20 @@
 import { api } from './client'
 import { cleanParams, pageQuery } from './params'
-import type { EngineRunResult, MonitoringRule, Page, PageParams, RuleFilters, RuleRequest, RuleVersion } from './types'
+import type { EngineRunResult, MonitoringRule, Page, PageParams, RuleFilters, RuleMetrics, RuleRequest, RuleVersion } from './types'
 
-/**
- * Pagina no cliente. DIVERGÊNCIA: `GET /rules` devolve `List` (sem Page) e só regras ativas
- * (`findByActiveTrue`); por isso filtro/ordenação/paginação ficam aqui até o backend paginar.
- */
-export function toPage<T>(items: T[], paging: PageParams): Page<T> {
-  const { page = 0, size = 20 } = pageQuery(paging)
-  const [field, dir] = (paging.sort ?? '').split(',')
-  const sorted = [...items]
-  if (field) {
-    sorted.sort((a, b) => {
-      const av = (a as Record<string, unknown>)[field]
-      const bv = (b as Record<string, unknown>)[field]
-      if (av == null && bv == null) return 0
-      if (av == null) return 1
-      if (bv == null) return -1
-      return (av < bv ? -1 : av > bv ? 1 : 0) * (dir === 'desc' ? -1 : 1)
-    })
-  }
-  return { content: sorted.slice(page * size, page * size + size), totalElements: items.length, totalPages: Math.ceil(items.length / size), number: page, size }
-}
-
-export function filterRules(items: MonitoringRule[], f: RuleFilters): MonitoringRule[] {
-  const q = f.q?.trim().toLowerCase()
-  return items.filter(
-    (r) =>
-      (!f.status || r.status === f.status) &&
-      (!f.category || r.category === f.category) &&
-      (!f.severity || r.severity === f.severity) &&
-      (!q || r.code.toLowerCase().includes(q) || r.name.toLowerCase().includes(q)),
-  )
-}
-
-/** `includeInactive=true` é PROPOSTA (backend ignora e devolve só ativas); a tela avisa quando só vêm ativas. */
-export async function listAllRules(): Promise<MonitoringRule[]> {
-  const res = await api.get<MonitoringRule[] | Page<MonitoringRule>>('/rules', { params: { includeInactive: true } })
-  return Array.isArray(res.data) ? res.data : res.data.content
-}
-
+/** Paginado no servidor. Padrão = só ativas; `includeInactive` inclui todas; `status` (CSV) prevalece. */
 export async function listRules(filters: RuleFilters, paging: PageParams): Promise<Page<MonitoringRule>> {
-  return toPage(filterRules(await listAllRules(), filters), paging)
+  const params = cleanParams({ ...filters, ...pageQuery(paging) })
+  return (await api.get<Page<MonitoringRule>>('/rules', { params })).data
 }
 
-/** DIVERGÊNCIA: não há `GET /rules/{code}`; o detalhe localiza a regra na listagem. */
-export async function getRule(code: string): Promise<MonitoringRule | null> {
-  return (await listAllRules()).find((r) => r.code === code) ?? null
+export async function getRule(code: string): Promise<MonitoringRule> {
+  return (await api.get<MonitoringRule>(`/rules/${encodeURIComponent(code)}`)).data
+}
+
+/** Métricas dos últimos 30 dias por padrão. */
+export async function getRuleMetrics(code: string, range: { from?: string; to?: string } = {}): Promise<RuleMetrics> {
+  return (await api.get<RuleMetrics>(`/rules/${encodeURIComponent(code)}/metrics`, { params: cleanParams(range) })).data
 }
 
 export async function listRuleVersions(code: string): Promise<RuleVersion[]> {
@@ -63,7 +31,7 @@ export async function updateRule(code: string, body: RuleRequest): Promise<Monit
   return (await api.put<MonitoringRule>(`/rules/${encodeURIComponent(code)}`, body)).data
 }
 
-/** Backend recebe `comment` como query param. */
+/** Backend recebe `comment` como query param. Aprovador != criador (quatro olhos). */
 export async function approveRule(code: string, comment?: string): Promise<MonitoringRule> {
   const params = cleanParams({ comment })
   return (await api.post<MonitoringRule>(`/rules/${encodeURIComponent(code)}/approve`, null, { params })).data

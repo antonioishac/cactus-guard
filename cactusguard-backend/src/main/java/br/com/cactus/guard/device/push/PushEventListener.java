@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+import br.com.cactus.guard.tenant.TenantContext;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -28,6 +29,10 @@ public class PushEventListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onCriticalAlert(CriticalAlertCreatedEvent event) {
+        TenantContext.runAs(event.tenantId(), () -> handleCritical(event));
+    }
+
+    private void handleCritical(CriticalAlertCreatedEvent event) {
         try {
             PushMessage msg = PushMessage.criticalAlert(event.alertId());
             Optional<UUID> assignee = resolver.alertAssignee(event.alertId());
@@ -44,6 +49,10 @@ public class PushEventListener {
     @Async
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
     public void onCasePendingApproval(CasePendingApprovalEvent event) {
+        TenantContext.runAs(event.tenantId(), () -> handlePending(event));
+    }
+
+    private void handlePending(CasePendingApprovalEvent event) {
         try {
             Set<UUID> exclude = event.decidedById() == null ? Set.of() : Set.of(event.decidedById());
             dispatcher.dispatch(null, Set.of("SUPERVISOR"), exclude,

@@ -7,25 +7,19 @@ import { RuleActions } from '../components/RuleActions'
 import { RuleStatusBadge } from '../components/Shared'
 import { VersionHistory } from '../components/VersionHistory'
 import { paramsToFields } from '../params'
-import { useRule, useRuleVersions } from '../hooks'
+import { useRule, useRuleMetrics, useRuleVersions } from '../hooks'
 import { categoryLabel } from '../ui-rules'
 
 export function RuleDetailPage() {
   const { code } = useParams()
   const rule = useRule(code)
   const versions = useRuleVersions(code)
+  const metrics = useRuleMetrics(code)
 
   if (rule.isLoading) return <Skeleton className="h-64 w-full" />
   if (rule.error) return <ErrorState error={rule.error} onRetry={() => void rule.refetch()} />
   const r = rule.data
-  if (!r) {
-    return (
-      <>
-        <PageHeader title={code ?? 'Regra'} subtitle="Regra não localizada na listagem da API (a API atual lista só regras ativas)." />
-        <Card title="Histórico de versões">{versions.data ? <VersionHistory versions={versions.data} /> : <ErrorState error={versions.error} compact />}</Card>
-      </>
-    )
-  }
+  if (!r) return null
   const fields = paramsToFields(r.parameters)
 
   return (
@@ -53,13 +47,22 @@ export function RuleDetailPage() {
               {r.appliesToRiskLevels?.length ? <span className="flex gap-1">{r.appliesToRiskLevels.map((l) => <Badge key={l} tone="info">{l}</Badge>)}</span> : 'Todos'}
             </KeyValue>
             <KeyValue label="Criada/alterada por">{r.createdByName ?? '—'}</KeyValue>
+            <KeyValue label="Aprovada por">{r.approvedByName ? `${r.approvedByName} em ${formatDateTime(r.approvedAt)}` : '—'}</KeyValue>
+            <KeyValue label="Versão vigente">{r.activeVersion != null ? `v${r.activeVersion}` : 'Nenhuma'}</KeyValue>
+            <KeyValue label="Comunicação automática">{r.autoCommunication ? 'Sim (COE, sem análise)' : 'Não'}</KeyValue>
           </dl>
         </Card>
-        <Card title="Métricas">
-          <dl className="grid gap-4">
-            <KeyValue label="Alertas gerados">{r.alertsGenerated != null ? formatNumber(r.alertsGenerated) : 'Não exposto pela API'}</KeyValue>
-            <KeyValue label="Taxa de falso positivo">{r.falsePositiveRate != null ? formatPercent(r.falsePositiveRate * 100) : 'Não exposta pela API'}</KeyValue>
-          </dl>
+        <Card title="Métricas (últimos 30 dias)">
+          {metrics.isLoading && <Skeleton className="h-24 w-full" />}
+          {metrics.isError && <ErrorState error={metrics.error} compact />}
+          {metrics.data && (
+            <dl className="grid gap-4">
+              <KeyValue label="Alertas gerados">{formatNumber(metrics.data.alertsGenerated)}</KeyValue>
+              <KeyValue label="Alertas encerrados">{formatNumber(metrics.data.alertsClosed)}</KeyValue>
+              <KeyValue label="Falsos positivos">{formatNumber(metrics.data.falsePositives)}</KeyValue>
+              <KeyValue label="Taxa de falso positivo">{metrics.data.falsePositiveRate != null ? formatPercent(metrics.data.falsePositiveRate * 100) : 'Sem alertas encerrados'}</KeyValue>
+            </dl>
+          )}
         </Card>
 
         <Card title="Parâmetros da versão" className="lg:col-span-3">

@@ -3,16 +3,17 @@ import type { Case, CaseFilters, CaseStatus, SlaStatus } from '@/api/types'
 import { Badge, SeverityBadge, StatusBadge } from '@/components/ui/Badge'
 import { DataTable } from '@/components/ui/DataTable'
 import type { Column } from '@/components/ui/DataTable'
-import { DeadlineBadge } from '@/components/ui/DeadlineBadge'
+import { SlaBadge } from '@/components/ui/SlaBadge'
 import { FilterBar, SelectFilter, TextFilter } from '@/components/ui/Filters'
 import { PageHeader } from '@/components/ui/Layout'
 import { useListState } from '@/hooks/useListState'
 import { severityLabel, statusLabel } from '@/lib/format'
 import { useAuth } from '@/features/auth/useAuth'
 import { useCases } from '../hooks'
+import { currentDeadline } from '../ui-rules'
 
-const KEYS = ['status', 'assignedTo', 'slaStatus', 'riskCategory', 'from', 'to', 'partyId'] as const
-const STATUSES: CaseStatus[] = ['OPEN', 'ESCALATED', 'PENDING_APPROVAL', 'COMMUNICATE', 'ARCHIVED']
+const KEYS = ['status', 'assignedTo', 'slaStatus', 'riskCategory', 'isEdd', 'from', 'to', 'partyId'] as const
+const STATUSES: CaseStatus[] = ['OPEN', 'IN_ANALYSIS', 'ESCALATED', 'PENDING_APPROVAL', 'COMMUNICATE', 'COMMUNICATED', 'ARCHIVED']
 const SLA: { value: SlaStatus; label: string }[] = [
   { value: 'ON_TIME', label: 'No prazo' },
   { value: 'DUE_SOON', label: 'Vencendo' },
@@ -42,17 +43,15 @@ const columns: Column<Case>[] = [
     ),
   },
   { key: 'priority', header: 'Prioridade', sortField: 'priority', render: (c) => <SeverityBadge severity={String(c.priority)} /> },
+  { key: 'risk', header: 'Risco da parte', render: (c) => (c.partyRiskLevel ? severityLabel(c.partyRiskLevel) : '—') },
   {
-    key: 'analysis',
-    header: 'Prazo de análise (45 d)',
+    key: 'sla',
+    header: 'Prazo vigente (SLA)',
     sortField: 'analysisDeadline',
-    render: (c) => <DeadlineBadge stage="analysis" deadline={c.analysisDeadline} doneAt={c.closedAt ?? (c.status === 'ARCHIVED' ? c.decidedAt : null)} />,
-  },
-  {
-    key: 'comm',
-    header: 'Comunicação COAF (D+1 útil)',
-    sortField: 'communicationDeadline',
-    render: (c) => (c.communicationDeadline ? <DeadlineBadge stage="communication" deadline={c.communicationDeadline} /> : <span className="text-xs text-muted">—</span>),
+    render: (c) => {
+      const cur = currentDeadline(c)
+      return <SlaBadge slaStatus={c.slaStatus} deadline={cur.deadline} phase={cur.phase} />
+    },
   },
 ]
 
@@ -65,6 +64,7 @@ export function CaseListPage() {
     assignedTo: f.assignedTo || undefined,
     slaStatus: (f.slaStatus || undefined) as SlaStatus | undefined,
     riskCategory: f.riskCategory || undefined,
+    isEdd: f.isEdd === 'true' ? true : undefined,
     from: f.from || undefined,
     to: f.to || undefined,
     partyId: f.partyId || undefined,
@@ -77,7 +77,8 @@ export function CaseListPage() {
       <FilterBar onClear={list.clear} hasActive={list.hasActive}>
         <SelectFilter label="Status" value={f.status} onChange={(v) => list.setFilter('status', v)} options={STATUSES.map((s) => ({ value: s, label: statusLabel(s) }))} />
         <SelectFilter label="Prazo (SLA)" value={f.slaStatus} onChange={(v) => list.setFilter('slaStatus', v)} options={SLA} />
-        <SelectFilter label="Risco / prioridade" value={f.riskCategory} onChange={(v) => list.setFilter('riskCategory', v)} options={['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map((s) => ({ value: s, label: severityLabel(s) }))} />
+        <SelectFilter label="Risco / prioridade" value={f.riskCategory} onChange={(v) => list.setFilter('riskCategory', v)} options={[...['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map((s) => ({ value: s, label: severityLabel(s) })), { value: 'PEP', label: 'PEP' }]} />
+        <SelectFilter label="EDD" value={f.isEdd} onChange={(v) => list.setFilter('isEdd', v)} options={[{ value: 'true', label: 'Somente EDD' }]} />
         <SelectFilter label="Responsável" value={f.assignedTo} onChange={(v) => list.setFilter('assignedTo', v)} options={user ? [{ value: user.id, label: 'Somente meus cases' }] : []} />
         <TextFilter label="De" type="date" value={f.from} onChange={(v) => list.setFilter('from', v)} />
         <TextFilter label="Até" type="date" value={f.to} onChange={(v) => list.setFilter('to', v)} />

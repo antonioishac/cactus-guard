@@ -1,50 +1,15 @@
-/** Handlers MSW da etapa 2A: partes/KYC/PEP/risco, screening, watchlist, KYC e usuários. */
+/** Handlers MSW: partes/KYC/PEP/risco, screening, watchlist, KYC e usuários (contratos da spec 033). */
 import { http, HttpResponse } from 'msw'
-import type { KycProcess, Page, Party, PartyRequest, PepRequest, ScreeningResult, Transaction, UserAccount } from '@/api/types'
-import { MOCK_USERS } from '../data'
-import type { MockUser } from '../data'
+import type { KycProcess, Party, PartyRequest, PepRequest, PiiField, RevealRequest, ScreeningResult, ScreeningReviewRequest, Transaction, UserAccount } from '@/api/types'
+import { db, REVEALED } from '../data'
 import { pld } from '../pldData'
+import { ANALYSTS, API, READ as READERS, SUP, err, guard, invalid, isResponse, jsonBody, nonBlank, paginate, readMultipart } from './helpers'
 
-const API = '*/api/v1'
-const ANALYSTS = ['ANALYST', 'SUPERVISOR']
-const READERS = ['ANALYST', 'SUPERVISOR', 'ADMIN', 'AUDITOR']
-
-function err(status: number, message: string) {
-  return HttpResponse.json({ timestamp: new Date().toISOString(), status, error: String(status), message }, { status })
-}
-function userFrom(request: Request): MockUser | null {
-  const m = /^Bearer acc\.([^.]+)\./.exec(request.headers.get('authorization') ?? '')
-  return MOCK_USERS.find((u) => u.id === m?.[1]) ?? null
-}
-function guard(request: Request, roles: string[]): MockUser | Response {
-  const u = userFrom(request)
-  if (!u) return err(401, 'Não autenticado')
-  if (!u.roles.some((r) => roles.includes(r))) return err(403, 'Acesso negado')
-  return u
-}
-const isResponse = (v: MockUser | Response): v is Response => v instanceof Response
-
-function paginate<T>(items: T[], url: URL): Page<T> {
-  const page = Number(url.searchParams.get('page') ?? 0)
-  const size = Number(url.searchParams.get('size') ?? 20)
-  const [field, dir] = (url.searchParams.get('sort') ?? '').split(',')
-  const sorted = [...items]
-  if (field) {
-    sorted.sort((a, b) => {
-      const av = (a as Record<string, unknown>)[field]
-      const bv = (b as Record<string, unknown>)[field]
-      if (av == null && bv == null) return 0
-      if (av == null) return 1
-      if (bv == null) return -1
-      return (av < bv ? -1 : av > bv ? 1 : 0) * (dir === 'desc' ? -1 : 1)
-    })
-  }
-  return { content: sorted.slice(page * size, page * size + size), totalElements: items.length, totalPages: Math.ceil(items.length / size), number: page, size }
-}
+const REVEAL_ROLES = ['ANALYST', 'SUPERVISOR', 'AUDITOR']
+const PII_FIELDS: PiiField[] = ['document', 'email', 'phone', 'motherName']
 
 const strip = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
 const onlyDigits = (s: string) => s.replace(/\D/g, '')
-const nonBlank = (s: string | null | undefined) => (s ?? '').replace(/\s/g, '').length
 const maskDoc = (d: string) => (d.length === 14 ? `**.${d.slice(2, 5)}.${d.slice(5, 8)}/${d.slice(8, 12)}-**` : `***.${d.slice(3, 6)}.${d.slice(6, 9)}-**`)
 
 function filterParties(url: URL): Party[] {
@@ -55,9 +20,16 @@ function filterParties(url: URL): Party[] {
     const digits = onlyDigits(q)
     items = items.filter((x) => strip(x.name).includes(strip(q)) || (digits.length >= 6 && onlyDigits(x.document).includes(digits.slice(3, 6))))
   }
-  if (p.get('type')) items = items.filter((x) => x.type === p.get('type'))
+  const doc = p.get('document')
+  if (doc) {
+    const d = onlyDigits(doc)
+    items = items.filter((x) => d.length >= 9 && onlyDigits(x.document).includes(d.slice(3, 6)))
+  }
+  const type = p.get('type') ?? p.get('personType')
+  if (type) items = items.filter((x) => x.type === type)
   if (p.get('riskLevel')) items = items.filter((x) => x.riskLevel === p.get('riskLevel'))
-  if (p.get('pep')) items = items.filter((x) => !!x.pep === (p.get('pep') === 'true'))
+  const pep = p.get('pep') ?? p.get('isPep')
+  if (pep) items = items.filter((x) => !!x.pep === (pep === 'true'))
   if (p.get('sourceType')) items = items.filter((x) => x.sourceType === p.get('sourceType'))
   return items
 }
@@ -78,12 +50,17 @@ export const pldHandlers = [
   http.post(`${API}/parties`, async ({ request }) => {
     const u = guard(request, ANALYSTS)
     if (isResponse(u)) return u
-    const b = (await request.json()) as PartyRequest
+    const b = await jsonBody<PartyRequest>(request)
     const digits = onlyDigits(b.document ?? '')
-    if (!b.name?.trim() || !digits) return err(400, 'name/document: obrigatórios')
+    const fe = [
+      ...(!b.name?.trim() ? [{ field: 'name', message: 'must not be blank' }] : []),
+      ...(!digits ? [{ field: 'document', message: 'must not be blank' }] : []),
+      ...(!b.type ? [{ field: 'type', message: 'must not be null' }] : []),
+    ]
+    if (fe.length) return invalid('Dados inválidos', fe)
     if (pld.parties.some((p) => p.document === maskDoc(digits))) return err(422, 'Documento já cadastrado')
     const party: Party = {
-      id: `p-${String(pld.parties.length + 1).padStart(4, '0')}`, type: b.type, document: maskDoc(digits), name: b.name, tradeName: b.tradeName ?? null,
+      id: `p-${String(pld.parties.length + 1).padStart(4, '0')}`, type: b.type!, document: maskDoc(digits), name: b.name!, tradeName: b.tradeName ?? null,
       email: b.email ? 'c***@e***.com' : null, phone: b.phone ? '(11) *****-0000' : null, riskLevel: 'LOW', birthDate: b.birthDate ?? null, nationality: b.nationality ?? null,
       occupation: b.occupation ?? null, status: 'ACTIVE', createdAt: new Date().toISOString(), sourceType: 'ONBOARDED', riskScore: 10, pep: false, pepStatus: 'NONE',
     }
@@ -101,10 +78,48 @@ export const pldHandlers = [
     if (isResponse(u)) return u
     const p = findParty(params.id)
     if (!p) return err(404, 'Parte não encontrada')
-    const b = (await request.json()) as PartyRequest
-    // como o backend deveria: ignora valores mascarados
-    Object.assign(p, { name: b.name, tradeName: b.tradeName ?? null, occupation: b.occupation ?? p.occupation, nationality: b.nationality ?? p.nationality })
+    const b = await jsonBody<PartyRequest>(request)
+    if (!b.name?.trim()) return invalid('Dados inválidos', [{ field: 'name', message: 'must not be blank' }])
+    // documento imutável: ausente/mascarado/igual é ignorado; diferente e completo => 422 DOCUMENT_IMMUTABLE
+    if (b.document && !b.document.includes('*')) {
+      const digits = onlyDigits(b.document)
+      if (digits && maskDoc(digits) !== p.document) return err(422, 'O documento da parte não pode ser alterado', 'DOCUMENT_IMMUTABLE')
+    }
+    // email/phone/motherName: mascarado (`*`) ou null mantém o valor atual; "" limpa
+    const keep = (incoming: string | null | undefined, current: string | null | undefined) => (incoming == null || incoming.includes('*') ? (current ?? null) : incoming === '' ? null : incoming)
+    Object.assign(p, {
+      name: b.name, tradeName: b.tradeName ?? null, occupation: b.occupation ?? p.occupation, nationality: b.nationality ?? p.nationality,
+      email: keep(b.email, p.email), phone: keep(b.phone, p.phone), motherName: keep(b.motherName, p.motherName),
+      ...(b.declaredMonthlyIncome != null ? { declaredMonthlyIncome: b.declaredMonthlyIncome } : {}),
+    })
     return HttpResponse.json(p)
+  }),
+  http.post(`${API}/parties/:id/reveal`, async ({ request, params }) => {
+    const u = guard(request, REVEAL_ROLES)
+    if (isResponse(u)) return u
+    const p = findParty(params.id)
+    if (!p) return err(404, 'Parte não encontrada')
+    const b = await jsonBody<RevealRequest>(request)
+    const fields = [...(b.fields ?? []), ...(b.field ? [b.field] : [])].filter((f, i, a) => a.indexOf(f) === i)
+    const reason = (b.reason ?? '').trim()
+    const fe = [
+      ...(reason.length < 10 || reason.length > 500 ? [{ field: 'reason', message: 'size must be between 10 and 500' }] : []),
+      ...(fields.length === 0 || fields.some((f) => !PII_FIELDS.includes(f)) ? [{ field: 'field', message: 'informe field/fields: document, email, phone ou motherName' }] : []),
+    ]
+    if (fe.length) return invalid('Dados inválidos', fe)
+    db.revealLog.push({ partyId: p.id, fields, reason, by: u.id })
+    const values = Object.fromEntries(fields.map((f) => [f, REVEALED[f] ?? ''])) as Partial<Record<PiiField, string>>
+    return HttpResponse.json({ field: b.field ?? null, value: b.field ? (values[b.field] ?? null) : null, values }, { headers: { 'Cache-Control': 'no-store' } })
+  }),
+  http.get(`${API}/parties/:id/pep`, ({ request, params }) => {
+    const u = guard(request, READERS)
+    if (isResponse(u)) return u
+    const p = findParty(params.id)
+    if (!p) return err(404, 'Parte não encontrada')
+    return HttpResponse.json({
+      partyId: p.id, pep: !!p.pep, pepStatus: p.pepStatus ?? 'NONE', category: p.pepCategory ?? null, role: p.pepRole ?? null, startDate: p.pepStartDate ?? null, endDate: p.pepEndDate ?? null,
+      expiryDate: p.pepExpiryDate ?? null, approved: !!p.pepApprovalAt, eddRequired: !!p.eddRequired, riskLevel: p.riskLevel, approvedAt: p.pepApprovalAt ?? null, approvedByName: p.pepApprovalByName ?? null,
+    })
   }),
   http.get(`${API}/parties/:id/addresses`, ({ request, params }) => {
     const u = guard(request, READERS)
@@ -123,13 +138,13 @@ export const pldHandlers = [
     if (isResponse(u)) return u
     const p = findParty(params.id)
     if (!p) return err(404, 'Parte não encontrada')
-    const b = (await request.json()) as PepRequest
+    const b = await jsonBody<PepRequest>(request)
     if (nonBlank(b.justification) < 20) return err(422, 'Justificativa obrigatória (mínimo de 20 caracteres)')
     Object.assign(p, { pep: true, pepStatus: b.related ? 'RELATED' : 'ACTIVE', pepCategory: b.category, pepRole: b.role ?? null, pepStartDate: b.startDate ?? null, pepEndDate: b.endDate ?? null, eddRequired: true, riskLevel: p.riskLevel === 'LOW' || p.riskLevel === 'MEDIUM' ? 'HIGH' : p.riskLevel, pepApprovalAt: null })
-    return HttpResponse.json({ partyId: p.id, pep: true, pepStatus: p.pepStatus, category: b.category, role: b.role ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, expiryDate: null, approved: false, eddRequired: true, riskLevel: p.riskLevel })
+    return HttpResponse.json({ partyId: p.id, pep: true, pepStatus: p.pepStatus, category: b.category, role: b.role ?? null, startDate: b.startDate ?? null, endDate: b.endDate ?? null, expiryDate: null, approved: false, eddRequired: true, riskLevel: p.riskLevel, approvedAt: null, approvedByName: null })
   }),
   http.post(`${API}/parties/:id/pep/approve`, async ({ request, params }) => {
-    const u = guard(request, ['SUPERVISOR'])
+    const u = guard(request, SUP)
     if (isResponse(u)) return u
     const p = findParty(params.id)
     if (!p) return err(404, 'Parte não encontrada')
@@ -137,10 +152,10 @@ export const pldHandlers = [
     pld.pepApprovals.push({ partyId: p.id, comment, by: u.id })
     p.pepApprovalAt = new Date().toISOString()
     p.pepApprovalByName = u.name
-    return HttpResponse.json({ partyId: p.id, pep: true, pepStatus: p.pepStatus ?? 'ACTIVE', category: p.pepCategory ?? null, role: p.pepRole ?? null, startDate: null, endDate: null, expiryDate: null, approved: true, eddRequired: !!p.eddRequired, riskLevel: p.riskLevel })
+    return HttpResponse.json({ partyId: p.id, pep: true, pepStatus: p.pepStatus ?? 'ACTIVE', category: p.pepCategory ?? null, role: p.pepRole ?? null, startDate: null, endDate: null, expiryDate: null, approved: true, eddRequired: !!p.eddRequired, riskLevel: p.riskLevel, approvedAt: p.pepApprovalAt, approvedByName: u.name })
   }),
   http.post(`${API}/parties/:id/risk/recalculate`, ({ request, params }) => {
-    const u = guard(request, ['SUPERVISOR', 'ADMIN'])
+    const u = guard(request, ANALYSTS)
     if (isResponse(u)) return u
     const p = findParty(params.id)
     if (!p) return err(404, 'Parte não encontrada')
@@ -173,13 +188,16 @@ export const pldHandlers = [
     if (isResponse(u)) return u
     const p = findParty(params.partyId)
     if (!p) return err(404, 'Parte não encontrada')
-    const hit: ScreeningResult = { id: `s-${Date.now()}`, partyId: p.id, partyName: p.name, listCode: 'PEP', matchedName: p.name, matchedDocument: p.document, matchScore: 88, matchType: 'FUZZY', status: 'PENDING', createdAt: new Date().toISOString() }
+    const hit: ScreeningResult = {
+      id: `s-${Date.now()}`, partyId: p.id, partyName: p.name, listCode: 'PEP', matchedName: p.name, matchedDocument: p.document, matchScore: 88, matchType: 'FUZZY', status: 'PENDING',
+      createdAt: new Date().toISOString(), requiresAssetFreeze: false, reviewJustification: null, reviewedAt: null, reviewedByName: null,
+    }
     pld.hits.unshift(hit)
     return HttpResponse.json(hit)
   }),
   http.get(`${API}/screening/lists`, ({ request }) => {
     const u = guard(request, READERS)
-    return isResponse(u) ? u : err(404, 'Não encontrado') // endpoint ainda inexistente: a UI usa o catálogo ilustrativo
+    return isResponse(u) ? u : HttpResponse.json(pld.lists)
   }),
   http.get(`${API}/screening`, ({ request }) => {
     const u = guard(request, READERS)
@@ -191,12 +209,17 @@ export const pldHandlers = [
   http.post(`${API}/screening/:id/review`, async ({ request, params }) => {
     const u = guard(request, ANALYSTS)
     if (isResponse(u)) return u
-    const form = new URLSearchParams(await request.text())
-    const status = form.get('status') ?? ''
-    const justification = form.get('justification') ?? ''
+    // JSON (a justificativa não vai à URL); query/formulário continuam aceitos por compatibilidade
+    const url = new URL(request.url)
+    const ct = request.headers.get('content-type') ?? ''
+    const body: Partial<ScreeningReviewRequest> = ct.includes('json')
+      ? await jsonBody<ScreeningReviewRequest>(request)
+      : Object.fromEntries(new URLSearchParams(await request.text())) as Partial<ScreeningReviewRequest>
+    const status = body.status ?? url.searchParams.get('status') ?? ''
+    const justification = body.justification ?? url.searchParams.get('justification') ?? ''
     const hit = pld.hits.find((h) => h.id === params.id)
     if (!hit) return err(404, 'Hit não encontrado')
-    if (status !== 'CONFIRMED' && status !== 'FALSE_POSITIVE') return err(400, 'status inválido')
+    if (status !== 'CONFIRMED' && status !== 'FALSE_POSITIVE') return err(400, 'status inválido: use CONFIRMED ou FALSE_POSITIVE', 'VALIDATION_ERROR')
     if (nonBlank(justification) < 20) return err(422, 'Justificativa obrigatória (mínimo de 20 caracteres)')
     hit.status = status
     hit.reviewJustification = justification
@@ -218,17 +241,17 @@ export const pldHandlers = [
     return isResponse(u) ? u : HttpResponse.json(pld.watchlist.filter((w) => w.active))
   }),
   http.post(`${API}/watchlist`, async ({ request }) => {
-    const u = guard(request, ['SUPERVISOR'])
+    const u = guard(request, SUP)
     if (isResponse(u)) return u
     const f = new URLSearchParams(await request.text())
     const doc = onlyDigits(f.get('document') ?? '')
-    if (!doc || !f.get('name') || nonBlank(f.get('reason')) < 20) return err(400, 'document/name/reason: obrigatórios')
+    if (!doc || !f.get('name') || nonBlank(f.get('reason')) < 20) return err(400, 'document/name/reason: obrigatórios', 'VALIDATION_ERROR')
     const w = { id: `w-${Date.now()}`, document: maskDoc(doc), name: f.get('name')!, reason: f.get('reason')!, severity: f.get('severity') ?? 'HIGH', active: true, createdAt: new Date().toISOString(), expiresAt: null }
     pld.watchlist.push(w)
     return HttpResponse.json(w)
   }),
   http.post(`${API}/watchlist/:id/deactivate`, ({ request, params }) => {
-    const u = guard(request, ['SUPERVISOR'])
+    const u = guard(request, SUP)
     if (isResponse(u)) return u
     const w = pld.watchlist.find((x) => x.id === params.id)
     if (!w) return err(404, 'Registro não encontrado')
@@ -257,7 +280,7 @@ export const pldHandlers = [
     return HttpResponse.json(k, { status: 201 })
   }),
   http.post(`${API}/kyc/documents/:id/approve`, ({ request, params }) => {
-    const u = guard(request, ['SUPERVISOR'])
+    const u = guard(request, SUP)
     if (isResponse(u)) return u
     const d = Object.values(pld.bundle.documents).flat().find((x) => x.id === params.id)
     if (!d) return err(404, 'Documento não encontrado')
@@ -275,7 +298,7 @@ export const pldHandlers = [
   http.post(`${API}/kyc/documents/:processId`, async ({ request, params }) => {
     const u = guard(request, ANALYSTS)
     if (isResponse(u)) return u
-    const file = (await request.formData()).get('file') as File | null
+    const { file } = await readMultipart(request)
     const doc = { id: `d-${Date.now()}`, processId: String(params.processId), documentType: new URL(request.url).searchParams.get('documentType') ?? 'OUTROS', fileName: file?.name ?? 'arquivo', status: 'PENDING', createdAt: new Date().toISOString() }
     ;(pld.bundle.documents[String(params.processId)] ??= []).push(doc)
     return HttpResponse.json(doc, { status: 201 })
@@ -294,7 +317,7 @@ export const pldHandlers = [
     return HttpResponse.json(item)
   }),
   http.post(`${API}/kyc/:id/approve`, ({ request, params }) => {
-    const u = guard(request, ['SUPERVISOR'])
+    const u = guard(request, SUP)
     if (isResponse(u)) return u
     const k = findProcess(params.id)
     if (!k) return err(404, 'Processo não encontrado')
@@ -303,7 +326,7 @@ export const pldHandlers = [
     return HttpResponse.json(k)
   }),
   http.post(`${API}/kyc/:id/reject`, ({ request, params }) => {
-    const u = guard(request, ['SUPERVISOR'])
+    const u = guard(request, SUP)
     if (isResponse(u)) return u
     const k = findProcess(params.id)
     if (!k) return err(404, 'Processo não encontrado')
@@ -321,8 +344,8 @@ export const pldHandlers = [
     const u = guard(request, ['ADMIN'])
     if (isResponse(u)) return u
     const b = (await request.json()) as { username: string; email: string; name: string; password: string; roles: string[] }
-    if (!b.password || b.password.length < 10) return err(400, 'password: deve ter entre 10 e 128 caracteres')
-    if (pld.users.some((x) => x.username === b.username)) return err(422, 'Usuário já existe')
+    if (!b.password || b.password.length < 10) return invalid('Dados inválidos', [{ field: 'password', message: 'size must be between 10 and 128' }])
+    if (pld.users.some((x) => x.username === b.username)) return err(422, 'Usuário já existe', 'USERNAME_IN_USE')
     const created: UserAccount = { id: `u-${Date.now()}`, username: b.username, email: b.email, name: b.name, active: true, roles: b.roles, createdAt: new Date().toISOString() }
     pld.users.push(created)
     return HttpResponse.json(created, { status: 201 })
@@ -332,8 +355,34 @@ export const pldHandlers = [
     if (isResponse(u)) return u
     const target = pld.users.find((x) => x.id === params.id)
     if (!target) return err(404, 'Usuário não encontrado')
-    Object.assign(target, (await request.json()) as Partial<UserAccount>)
+    const b = await jsonBody<{ name: string; email: string; roles: string[] }>(request)
+    const fe = [
+      ...(!b.name?.trim() ? [{ field: 'name', message: 'must not be blank' }] : []),
+      ...(!b.email?.trim() ? [{ field: 'email', message: 'must not be blank' }] : []),
+      ...(!b.roles || b.roles.length === 0 ? [{ field: 'roles', message: 'must not be empty' }] : []),
+    ]
+    if (fe.length) return invalid('Dados inválidos', fe)
+    if (pld.users.some((x) => x.id !== target.id && x.email.toLowerCase() === b.email!.toLowerCase())) return err(422, 'E-mail já em uso', 'EMAIL_IN_USE')
+    if (target.id === u.id && !b.roles!.includes('ADMIN')) return err(422, 'O administrador não pode remover o próprio perfil ADMIN')
+    Object.assign(target, { name: b.name!.trim(), email: b.email!.trim(), roles: b.roles })
     return HttpResponse.json(target)
+  }),
+  http.post(`${API}/users/:id/reset-password`, async ({ request, params }) => {
+    const u = guard(request, ['ADMIN'])
+    if (isResponse(u)) return u
+    const target = pld.users.find((x) => x.id === params.id)
+    if (!target) return err(404, 'Usuário não encontrado')
+    const b = await jsonBody<{ newPassword?: string }>(request)
+    if (b.newPassword !== undefined && (b.newPassword.length < 10 || b.newPassword.length > 128)) {
+      return invalid('Dados inválidos', [{ field: 'newPassword', message: 'size must be between 10 and 128' }])
+    }
+    const generated = b.newPassword === undefined
+    pld.passwordResets.push({ userId: target.id, generated })
+    // a senha definida pelo admin nunca é devolvida; a gerada vem UMA vez (no-store)
+    return HttpResponse.json(
+      { userId: target.id, temporaryPassword: generated ? `Tmp#${String(pld.passwordResets.length).padStart(2, '0')}-Xk9vQ2mLw7Rz` : null, refreshTokensRevoked: true },
+      { headers: { 'Cache-Control': 'no-store' } },
+    )
   }),
   http.post(`${API}/users/:id/deactivate`, ({ request, params }) => {
     const u = guard(request, ['ADMIN'])

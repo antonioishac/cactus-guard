@@ -1,5 +1,8 @@
 import type { ISODateTime, UUID } from './common'
 
+export type TransactionDirection = 'IN' | 'OUT'
+
+/** TransactionResponse (backend). Documento da contraparte já vem mascarado. */
 export interface Transaction {
   id: UUID
   partyId: UUID
@@ -8,7 +11,6 @@ export interface Transaction {
   amount: number
   currency: string
   counterpartyName: string | null
-  /** mascarado pela API */
   counterpartyDocument: string | null
   channel: string | null
   status: string
@@ -16,12 +18,30 @@ export interface Transaction {
   originCountry: string | null
   destinationCountry: string | null
   purpose: string | null
-  /** Backend (TransactionRequest) aceita IN|OUT; mocks/spec usam CREDIT|DEBIT. A UI trata os dois. */
-  direction: 'IN' | 'OUT' | 'CREDIT' | 'DEBIT' | string | null
+  direction: TransactionDirection | null
   cash: boolean
   amountBrl: number | null
   createdAt: ISODateTime
-  /** PIX, TED, DOC, BOLETO, CASH, CARD, FX, CRYPTO, INTERNAL: existe no request; ainda não no response. */
-  paymentMethod?: string | null
-  counterpartyCountry?: string | null
+  /** PIX, TED, DOC, BOLETO, CASH, CARD, FX, CRYPTO, INTERNAL */
+  paymentMethod: string | null
+  counterpartyCountry: string | null
+  endToEndId: string | null
+  externalReference: string | null
+}
+
+/** Resumo de transação em alerta/dossiê (sem conta/agência). */
+export interface TransactionSummary {
+  id: UUID
+  type: string
+  amount: number
+  currency: string
+  direction: TransactionDirection | null
+  transactionDate: ISODateTime
+  channel: string | null
+  cash: boolean
+  paymentMethod: string | null
+  counterpartyName: string | null
+  counterpartyDocument: string | null
+  counterpartyCountry: string | null
+  status: string
 }

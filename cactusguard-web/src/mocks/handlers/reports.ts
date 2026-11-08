@@ -1,10 +1,9 @@
 import { http, HttpResponse } from 'msw'
 import type { ReportGenerateRequest } from '@/api/types'
-import { API, err, guard, isResponse, paginate } from './helpers'
+import { API, READ, err, guard, invalid, isResponse, jsonBody, paginate } from './helpers'
 import { db2b } from './db2b'
 import type { MockJob } from './db2b'
 
-const READ = ['ANALYST', 'SUPERVISOR', 'ADMIN', 'AUDITOR']
 
 /** Cada consulta avança o job: PENDING -> PROCESSING -> COMPLETED (ou FAILED p/ período inválido). */
 function tick(job: MockJob): MockJob {
@@ -15,7 +14,7 @@ function tick(job: MockJob): MockJob {
     job.status = bad ? 'FAILED' : 'COMPLETED'
     job.completedAt = new Date().toISOString()
     job.downloadable = !bad
-    if (bad) job.errorMessage = 'Falha ao gerar: período inválido.'
+    if (bad) job.errorMessage = 'Não foi possível gerar o relatório. Contate o suporte informando a referência.'
   }
   return job
 }
@@ -57,10 +56,10 @@ export const reportsHandlers = [
     if (isResponse(u)) return u
     const def = db2b.defs.find((d) => d.code === params.code)
     if (!def) return err(404, `Report not found: ${String(params.code)}`)
-    const body = (await request.json()) as ReportGenerateRequest
-    if (!['PDF', 'EXCEL'].includes(body.format)) return err(400, 'Formato inválido')
+    const body = await jsonBody<ReportGenerateRequest>(request)
+    if (!body.format || !['PDF', 'EXCEL'].includes(body.format)) return invalid('Dados inválidos', [{ field: 'format', message: 'deve ser PDF ou EXCEL' }])
     const job: MockJob = {
-      id: `job-${db2b.jobs.length + 1}`, reportCode: def.code, status: 'PENDING', format: body.format, parameters: body.parameters ?? null, downloadable: false,
+      id: `job-${db2b.jobs.length + 1}`, reportCode: def.code, status: 'PENDING', format: body.format!, parameters: body.parameters ?? null, downloadable: false, errorMessage: null,
       createdAt: new Date().toISOString(), completedAt: null, ownerId: u.id, polls: 0,
     }
     db2b.jobs.unshift(job)

@@ -1,7 +1,7 @@
 import { api } from './client'
 import type { UUID, WatchlistCreate, WatchlistEntry } from './types'
 
-/** AUDITOR/ADMIN/SUPERVISOR. DIVERGÊNCIA: sem paginação no backend (lista todos os ativos). */
+/** AUDITOR/ADMIN/SUPERVISOR. Backend ainda sem paginação (lista todos os ativos) e a escrita usa @RequestParam. */
 export async function listWatchlist(): Promise<WatchlistEntry[]> {
   return (await api.get<WatchlistEntry[]>('/watchlist')).data
 }

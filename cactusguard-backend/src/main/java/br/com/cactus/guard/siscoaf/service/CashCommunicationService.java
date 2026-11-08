@@ -1,5 +1,8 @@
 package br.com.cactus.guard.siscoaf.service;
 
+import br.com.cactus.guard.event.dto.DomainEventType;
+import br.com.cactus.guard.event.service.DomainEventPublisher;
+import br.com.cactus.guard.event.service.EventPayloads;
 import br.com.cactus.guard.common.audit.AuditPayload;
 import br.com.cactus.guard.audit.service.AuditService;
 import br.com.cactus.guard.common.calendar.BusinessCalendar;
@@ -43,6 +46,7 @@ public class CashCommunicationService {
     private final MonitoringRuleRepository ruleRepository;
     private final AuditService auditService;
     private final BusinessCalendar calendar;
+    private final DomainEventPublisher events;
 
     /** Limiar vigente: parametro da regra CASH_50K quando ACTIVE; senao o limiar legal. */
     public BigDecimal currentThreshold() {
@@ -130,6 +134,7 @@ public class CashCommunicationService {
         audit.put("deadlineAt", deadline.toString());
         audit.put("basis", "Comunicacao automatica de especie >= limiar (excecao legal: dispensa decisao de suspeita)");
         AuditPayload.log(auditService, "COE_AUTO_CREATED", "SISCOAF_COMMUNICATION", coe.getId(), null, audit);
+        events.publish(DomainEventType.COMMUNICATION_CREATED, coe.getId(), EventPayloads.communication(coe));
         return Optional.of(coe);
     }
 }

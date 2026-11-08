@@ -124,7 +124,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       if (mock) ...[
                         const SizedBox(height: 24),
                         Text(
-                          'Modo demonstração (dados fictícios). Usuários: analista, supervisor, admin, auditor — senha ${FakeBackend.password}',
+                          'Modo demonstração (dados fictícios). Usuários: analista, supervisor, supervisor2, auditor — senha '
+                          '${FakeBackend.password}; admin — senha ${FakeBackend.adminPassword}',
                           textAlign: TextAlign.center,
                           style: t.textTheme.bodySmall?.copyWith(color: AppColors.muted),
                         ),

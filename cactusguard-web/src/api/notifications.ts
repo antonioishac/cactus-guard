@@ -13,3 +13,8 @@ export async function getUnreadCount(): Promise<number> {
 export async function markNotificationRead(id: UUID): Promise<void> {
   await api.post(`/notifications/${id}/read`)
 }
+
+/** Marca só as notificações do usuário autenticado. */
+export async function markAllNotificationsRead(): Promise<number> {
+  return (await api.post<{ updated: number }>('/notifications/read-all')).data.updated
+}

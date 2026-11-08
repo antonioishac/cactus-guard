@@ -1,12 +1,8 @@
 import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { resetDb2b } from '@/mocks/handlers/db2b'
-import { preload2B } from '@/test/preload2b'
+import { describe, expect, it } from 'vitest'
 import { loginAs, renderApp } from '@/test/utils'
 
-beforeAll(() => preload2B(), 30_000)
-beforeEach(() => resetDb2b())
 
 describe('auditoria', () => {
   it('ANALYST não acessa a rota (guarda por role)', async () => {

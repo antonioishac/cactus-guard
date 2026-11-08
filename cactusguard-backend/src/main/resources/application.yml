@@ -35,6 +35,56 @@ spring:
       # Dev: container "cactusguard-redis" do docker-compose.yml da raiz do projeto.
       host: ${CACTUS_REDIS_HOST:127.0.0.1}
       port: ${CACTUS_REDIS_PORT:6379}
+  kafka:
+    # Dev: cluster KRaft de 3 nos (portas do host). 127.0.0.1, nunca "localhost" (IPv6 ::1 atendido por outro servico).
+    bootstrap-servers: ${CACTUS_KAFKA_BOOTSTRAP:127.0.0.1:19092,127.0.0.1:29092,127.0.0.1:39092}
+    # Producao (sem segredo no repo; tudo por variavel de ambiente - ver specs/047 secao Eventos):
+    #   SASL/SCRAM: CACTUS_KAFKA_SECURITY_PROTOCOL=SASL_SSL, SPRING_KAFKA_PROPERTIES_SASL_MECHANISM=SCRAM-SHA-512,
+    #               SPRING_KAFKA_PROPERTIES_SASL_JAAS_CONFIG=<jaas com usuario/senha do cofre>
+    #   mTLS:       CACTUS_KAFKA_SECURITY_PROTOCOL=SSL + bundle SSL (SPRING_KAFKA_SSL_BUNDLE) com keystore/truststore
+    security:
+      protocol: ${CACTUS_KAFKA_SECURITY_PROTOCOL:PLAINTEXT}
+    producer:
+      acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        # falha rapida com broker fora: o outbox guarda e o relay retenta com backoff
+        max.block.ms: ${CACTUS_KAFKA_MAX_BLOCK_MS:5000}
+        request.timeout.ms: 4000
+        delivery.timeout.ms: 9000
+        linger.ms: 5
+    consumer:
+      group-id: ${CACTUS_KAFKA_GROUP_ID:cactus-monitoring}
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        isolation.level: read_committed
+    listener:
+      ack-mode: record
+
+cactus:
+  events:
+    # Chave mestra dos eventos de dominio (outbox + relay + topicos + consumidores). Perfil test: false.
+    enabled: ${CACTUS_EVENTS_ENABLED:true}
+    source: cactusguard
+    relay:
+      enabled: ${CACTUS_EVENTS_RELAY_ENABLED:true}
+      poll-interval: 500ms
+      batch-size: 100
+    cleanup:
+      retention-days: ${CACTUS_EVENTS_OUTBOX_RETENTION_DAYS:14}
+    topics:
+      # Producao com topicos gerenciados fora da aplicacao: CACTUS_EVENTS_TOPICS_CREATE=false
+      create: ${CACTUS_EVENTS_TOPICS_CREATE:true}
+      partitions: ${CACTUS_EVENTS_TOPIC_PARTITIONS:6}
+      replication-factor: ${CACTUS_EVENTS_TOPIC_RF:3}
+    consumer:
+      enabled: ${CACTUS_EVENTS_CONSUMER_ENABLED:true}
 
 server:
   port: 8080
@@ -115,6 +165,13 @@ resilience4j:
         sliding-window-size: 10
         failure-rate-threshold: 50
         wait-duration-in-open-state: 30s
+      # Broker Kafka do relay do outbox: aberto, o relay pula o ciclo (eventos ficam no outbox)
+      kafka-outbox:
+        sliding-window-size: 5
+        minimum-number-of-calls: 2
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 5s
+        permitted-number-of-calls-in-half-open-state: 1
   retry:
     instances:
       screening:
@@ -143,7 +200,7 @@ integrations:
 
 logging:
   pattern:
-    level: "%5p [%X{traceId:-}]"
+    level: "%5p [%X{traceId:-}] [tenant=%X{tenantId:-}]"
   level:
     org.springframework.security: INFO
     br.com.cactus.guard: INFO

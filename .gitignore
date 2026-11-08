@@ -30,8 +30,8 @@ storage/
 cactusguard-mobile/build/
 .dart_tool/
 .flutter-plugins-dependencies
-android/local.properties
-ios/Flutter/Generated.xcconfig
+**/android/local.properties
+**/ios/Flutter/Generated.xcconfig
 # Firebase: credenciais nunca versionadas
 **/google-services.json
 **/GoogleService-Info.plist

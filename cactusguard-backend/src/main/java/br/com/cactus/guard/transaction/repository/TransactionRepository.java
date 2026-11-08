@@ -14,6 +14,8 @@ import java.util.UUID;
 
 /**
  * Consultas do motor de regras sao agregadas por janela (uma consulta por regra, nao por parte).
+ * O parametro {@code partyId} e opcional: nulo = todas as partes (batch); preenchido = so aquela parte
+ * (monitoramento por evento, spec 047/048).
  * O valor de referencia e {@code coalesce(amountBrl, amount)} (amount_brl quando informado).
  */
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
@@ -35,44 +37,48 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     /** Transacoes de valor ao menos {@code min} na janela (qualquer parte). */
     @Query("""
            SELECT t FROM Transaction t JOIN FETCH t.party
-            WHERE t.transactionDate >= :since AND COALESCE(t.amountBrl, t.amount) >= :min
+            WHERE t.transactionDate >= :since AND COALESCE(t.amountBrl, t.amount) >= :min AND (:partyId IS NULL OR t.party.id = :partyId)
             ORDER BY t.transactionDate
            """)
-    List<Transaction> findAtLeastSince(@Param("min") BigDecimal min, @Param("since") Instant since);
+    List<Transaction> findAtLeastSince(@Param("min") BigDecimal min, @Param("since") Instant since,
+                                       @Param("partyId") UUID partyId);
 
     /** Transacoes na faixa [min, max) na janela. */
     @Query("""
            SELECT t FROM Transaction t JOIN FETCH t.party
             WHERE t.transactionDate >= :since
-              AND COALESCE(t.amountBrl, t.amount) >= :min AND COALESCE(t.amountBrl, t.amount) < :max
+              AND COALESCE(t.amountBrl, t.amount) >= :min AND COALESCE(t.amountBrl, t.amount) < :max AND (:partyId IS NULL OR t.party.id = :partyId)
             ORDER BY t.transactionDate
            """)
     List<Transaction> findInBandSince(@Param("min") BigDecimal min, @Param("max") BigDecimal max,
-                                      @Param("since") Instant since);
+                                      @Param("since") Instant since, @Param("partyId") UUID partyId);
 
     /** Partes com ao menos {@code minCount} transacoes na janela: [partyId, count]. */
     @Query("""
            SELECT t.party.id, COUNT(t) FROM Transaction t
-            WHERE t.transactionDate >= :since
+            WHERE t.transactionDate >= :since AND (:partyId IS NULL OR t.party.id = :partyId)
             GROUP BY t.party.id HAVING COUNT(t) >= :minCount
            """)
-    List<Object[]> countByPartySinceHaving(@Param("since") Instant since, @Param("minCount") long minCount);
+    List<Object[]> countByPartySinceHaving(@Param("since") Instant since, @Param("minCount") long minCount,
+                                           @Param("partyId") UUID partyId);
 
     /** Media por parte na janela, para partes com ao menos {@code minCount}: [partyId, count, avg]. */
     @Query("""
            SELECT t.party.id, COUNT(t), AVG(COALESCE(t.amountBrl, t.amount)) FROM Transaction t
-            WHERE t.transactionDate >= :since
+            WHERE t.transactionDate >= :since AND (:partyId IS NULL OR t.party.id = :partyId)
             GROUP BY t.party.id HAVING COUNT(t) >= :minCount
            """)
-    List<Object[]> averageByParty(@Param("since") Instant since, @Param("minCount") long minCount);
+    List<Object[]> averageByParty(@Param("since") Instant since, @Param("minCount") long minCount,
+                                  @Param("partyId") UUID partyId);
 
     /** Volume por parte na janela: [partyId, sum]. */
     @Query("""
            SELECT t.party.id, SUM(COALESCE(t.amountBrl, t.amount)) FROM Transaction t
-            WHERE t.transactionDate >= :since
+            WHERE t.transactionDate >= :since AND (:partyId IS NULL OR t.party.id = :partyId)
             GROUP BY t.party.id HAVING SUM(COALESCE(t.amountBrl, t.amount)) >= :minSum
            """)
-    List<Object[]> volumeByParty(@Param("since") Instant since, @Param("minSum") BigDecimal minSum);
+    List<Object[]> volumeByParty(@Param("since") Instant since, @Param("minSum") BigDecimal minSum,
+                                 @Param("partyId") UUID partyId);
 
     /** Volume por parte (subconjunto de partes) na janela: [partyId, sum]. */
     @Query("""
@@ -94,29 +100,32 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     @Query("""
            SELECT DISTINCT t.party.id FROM Transaction t
             WHERE t.direction = 'IN' AND t.transactionDate >= :since
-              AND COALESCE(t.amountBrl, t.amount) >= :min
+              AND COALESCE(t.amountBrl, t.amount) >= :min AND (:partyId IS NULL OR t.party.id = :partyId)
            """)
-    List<UUID> findPartyIdsWithInflowSince(@Param("min") BigDecimal min, @Param("since") Instant since);
+    List<UUID> findPartyIdsWithInflowSince(@Param("min") BigDecimal min, @Param("since") Instant since,
+                                           @Param("partyId") UUID partyId);
 
     /** Transacoes de partes PEP acima do limiar na janela. */
     @Query("""
            SELECT t FROM Transaction t JOIN FETCH t.party p
             WHERE p.pep = true AND p.pepStatus <> 'EXPIRED'
-              AND t.transactionDate >= :since AND COALESCE(t.amountBrl, t.amount) >= :min
+              AND t.transactionDate >= :since AND COALESCE(t.amountBrl, t.amount) >= :min AND (:partyId IS NULL OR t.party.id = :partyId)
             ORDER BY t.transactionDate
            """)
-    List<Transaction> findPepTransactionsSince(@Param("min") BigDecimal min, @Param("since") Instant since);
+    List<Transaction> findPepTransactionsSince(@Param("min") BigDecimal min, @Param("since") Instant since,
+                                               @Param("partyId") UUID partyId);
 
     /** Transacoes cuja origem, destino ou contraparte estao entre os paises informados. */
     @Query("""
            SELECT t FROM Transaction t JOIN FETCH t.party
             WHERE t.transactionDate >= :since AND COALESCE(t.amountBrl, t.amount) >= :min
               AND (t.originCountry IN :countries OR t.destinationCountry IN :countries
-                   OR t.counterpartyCountry IN :countries)
+                   OR t.counterpartyCountry IN :countries) AND (:partyId IS NULL OR t.party.id = :partyId)
             ORDER BY t.transactionDate
            """)
     List<Transaction> findByCountriesSince(@Param("countries") Collection<String> countries,
-                                           @Param("min") BigDecimal min, @Param("since") Instant since);
+                                           @Param("min") BigDecimal min, @Param("since") Instant since,
+                                           @Param("partyId") UUID partyId);
 
     /** Partes (subconjunto) com movimentacao envolvendo paises de alto risco na janela. */
     @Query("""

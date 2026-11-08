@@ -43,12 +43,16 @@ export type PartyFormValues = z.infer<ReturnType<typeof buildPartySchema>>
 const num = (v: string | undefined) => (v ? Number(v.replace(',', '.')) : null)
 const str = (v: string | undefined) => (v?.trim() ? v.trim() : null)
 
-export function toRequest(v: PartyFormValues): PartyRequest {
+/**
+ * `editing`: o documento é imutável e só é conhecido mascarado, então NÃO é enviado no PUT
+ * (o backend ignora ausente/mascarado e responde 422 DOCUMENT_IMMUTABLE se vier diferente e completo).
+ * E-mail/telefone/nome da mãe mascarados (`*`) são enviados como estão: o backend mantém o valor atual.
+ */
+export function toRequest(v: PartyFormValues, editing = false): PartyRequest {
   const pj = v.type === 'PJ'
   return {
     type: v.type,
-    // documento mascarado (edição) segue como veio; o backend deve ignorá-lo (ver DIVERGÊNCIA em api/parties.ts)
-    document: v.document.includes('*') ? v.document : onlyDigits(v.document),
+    ...(editing ? {} : { document: onlyDigits(v.document) }),
     name: v.name.trim(),
     tradeName: pj ? str(v.tradeName) : null,
     email: str(v.email),

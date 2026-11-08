@@ -1,0 +1,108 @@
+# Configuração do gitleaks (detecção de segredos) — usada no workflow security.yml e localmente:
+#   docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.30.1 git /repo -c /repo/.gitleaks.toml
+#
+# Política:
+#   * Regras padrão do gitleaks + regras próprias abaixo (formatos que o padrão não pega).
+#   * Allowlist SOMENTE para credenciais de DESENVOLVIMENTO/TESTE versionadas de propósito
+#     (ambiente local, nunca produção). Cada entrada exige arquivo E valor exatos (condition = "AND").
+#     O prefixo (?:^|/) só aceita o caminho relativo (modo git) ou sob a raiz montada (modo dir).
+#     Nada de allowlist por extensão, pasta inteira ou regex genérica.
+#   * Novo valor de dev/teste => nova entrada aqui, com comentário e aprovação no PR.
+#   * Segredo real detectado => revogar/rotacionar ANTES de remover do código (ver SECURITY.md).
+
+title = "CactusGuard gitleaks"
+
+[extend]
+useDefault = true
+
+# ---------------------------------------------------------------------------
+# Regras próprias
+# ---------------------------------------------------------------------------
+
+[[rules]]
+id = "spring-placeholder-default-secret"
+description = "Valor padrão embutido em placeholder Spring de credencial: ${VAR:valor}"
+regex = '''(?i)(?:password|passwd|secret|token|api-key|apikey|private-key)\s*:\s*['"]?\$\{[A-Z0-9_]+:([^}\s'"$]{4,})\}'''
+secretGroup = 1
+path = '''(?i)\.(?:ya?ml|properties)$'''
+keywords = ["password", "passwd", "secret", "token", "api-key", "apikey", "private-key"]
+
+[[rules]]
+id = "yaml-literal-credential"
+description = "Credencial literal em YAML/properties de configuração (deveria vir de variável de ambiente/cofre)"
+regex = '''(?im)^\s*(?:password|secret|legacy-key|key|keys|pepper|token|api-key)\s*[:=]\s*['"]?([^\s'"$#{][^\s'"#]{11,})'''
+secretGroup = 1
+path = '''(?i)\.(?:ya?ml|properties)$'''
+keywords = ["password", "secret", "key", "pepper", "token"]
+
+[[rules]]
+id = "bcrypt-hash"
+description = "Hash BCrypt de senha versionado (seed de usuários)"
+regex = '''\$2[aby]\$\d{2}\$[./A-Za-z0-9]{53}'''
+keywords = ["$2a$", "$2b$", "$2y$"]
+
+# ---------------------------------------------------------------------------
+# Allowlist explícita — credenciais de DEV/TESTE versionadas propositalmente
+#
+# IMPORTANTE: toda entrada tem `targetRules`. Allowlist global (sem targetRules) com `paths` faz o
+# gitleaks PULAR O ARQUIVO INTEIRO, ignorando condition = "AND" (verificado na v8.30.1) — um segredo
+# real adicionado depois nesses arquivos passaria despercebido. Com targetRules o filtro é por achado.
+# ---------------------------------------------------------------------------
+
+[[allowlists]]
+description = "DEV: senha padrão do PostgreSQL local (docker-compose, usuário app_user). Sobrescrita por CACTUS_DB_PASSWORD fora do dev."
+condition = "AND"
+targetRules = ["spring-placeholder-default-secret", "yaml-literal-credential", "bcrypt-hash", "generic-api-key"]
+paths = ['''(?:^|/)cactusguard-backend/src/main/resources/application\.yml$''']
+regexes = ['''^app_password$''']
+
+[[allowlists]]
+description = "DEV: segredos públicos do perfil 'dev' (JWT, chave de criptografia v1, chave legada, pepper do hash de documento). Nunca usados em produção."
+condition = "AND"
+targetRules = ["spring-placeholder-default-secret", "yaml-literal-credential", "bcrypt-hash", "generic-api-key"]
+paths = ['''(?:^|/)cactusguard-backend/src/main/resources/application-dev\.yml$''']
+regexes = [
+  '''^dev-only-jwt-secret-key-not-for-production-use-0123456789$''',
+  '''^v1:ZGV2LW9ubHktZW5jcnlwdGlvbi1rZXktMzJieXRlcyE=$''',
+  '''^v1:dev-only-encryption-key-32bytes!$''',  # mesmo valor acima, após decodificação base64 do gitleaks
+  '''^cactusguard-dev-key-32-bytes!!$''',
+  '''^dev-only-document-hash-pepper-0123456789abcdef$''',
+]
+
+[[allowlists]]
+description = "DEV: hashes BCrypt dos usuários de desenvolvimento (admin/admin123; demais/dev12345), carregados só no perfil 'dev'."
+condition = "AND"
+targetRules = ["spring-placeholder-default-secret", "yaml-literal-credential", "bcrypt-hash", "generic-api-key"]
+paths = ['''(?:^|/)cactusguard-backend/src/main/resources/db/dev/R__dev_users\.sql$''']
+regexes = [
+  '''^\$2a\$10\$tDiz5O/hpBGShV9Xs050seN1ja5bQ7rCybrp6jBHqc23qJ9B//LYK$''',
+  '''^\$2a\$10\$0LsAOBlZk52B4/ZDgD7U1eMAqpISRFRfFK1\.5r0v5gluXOeXsBngu$''',
+]
+
+[[allowlists]]
+description = "TESTE: segredos fixos do perfil 'test' (H2/Testcontainers). Só existem no classpath de teste."
+condition = "AND"
+targetRules = ["spring-placeholder-default-secret", "yaml-literal-credential", "bcrypt-hash", "generic-api-key"]
+paths = ['''(?:^|/)cactusguard-backend/src/test/resources/application-test\.yml$''']
+regexes = [
+  '''^test-secret-key-for-integration-tests-only$''',
+  '''^v1:dGVzdC1vbmx5LWVuY3J5cHRpb24ta2V5LTMyYnl0ZSE=$''',
+  '''^v1:test-only-encryption-key-32byte!$''',  # mesmo valor acima, após decodificação base64 do gitleaks
+  '''^test-only-document-hash-pepper-0123456789abcdef$''',
+]
+
+# ---------------------------------------------------------------------------
+# Histórico (risco aceito e registrado) — achado real do gitleaks em 2026-11-08
+# ---------------------------------------------------------------------------
+# Default de JWT_SECRET embutido no application.yml do commit inicial 12a3af1 (removido em e899027, hoje
+# `${JWT_SECRET:}` com fail-fast). O valor é PÚBLICO (repositório público): NUNCA pode ser usado como
+# segredo em nenhum ambiente. Ação exigida: confirmar que nenhum ambiente subiu sem JWT_SECRET nessas
+# versões; se subiu, rotacionar o segredo e invalidar sessões. Reescrever o histórico não é necessário
+# (o valor já é público) — a mitigação é garantir que ele não vale em lugar nenhum.
+# Restrito ao commit que o introduziu + valor exato: em qualquer outro commit o mesmo valor volta a falhar.
+[[allowlists]]
+description = "HISTÓRICO: default público de JWT_SECRET do commit inicial (não usado; ver comentário acima)."
+condition = "AND"
+targetRules = ["spring-placeholder-default-secret", "yaml-literal-credential", "generic-api-key"]
+commits = ["12a3af1c78660d7319070e3345708c7daab88415"]
+regexes = ['''^cactusguard-mvp-secret-key-change-in-production-2026$''']

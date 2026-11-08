@@ -2,13 +2,9 @@ import { api } from './client'
 import { pageQuery } from './params'
 import type { KycChecklistItem, KycDocument, KycProcess, Page, UUID } from './types'
 
-/**
- * DIVERGÊNCIA: o backend só lista processos por `status` (default IN_PROGRESS). `partyId` é PROPOSTO;
- * por segurança o resultado é filtrado de novo no cliente pela parte.
- */
+/** Todos os processos da parte (filtro `partyId` no servidor; `status` opcional). */
 export async function listKycByParty(partyId: UUID): Promise<KycProcess[]> {
-  const page = (await api.get<Page<KycProcess>>('/kyc', { params: { partyId, ...pageQuery({ size: 50, sort: 'createdAt,desc' }) } })).data
-  return page.content.filter((p) => p.partyId === partyId)
+  return (await api.get<Page<KycProcess>>('/kyc', { params: { partyId, ...pageQuery({ size: 50, sort: 'createdAt,desc' }) } })).data.content
 }
 
 export async function startOnboarding(partyId: UUID): Promise<KycProcess> {

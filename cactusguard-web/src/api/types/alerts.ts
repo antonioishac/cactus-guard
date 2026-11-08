@@ -1,13 +1,15 @@
 import type { ISODateTime, UUID } from './common'
+import type { TransactionSummary } from './transactions'
 
 export type Severity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'
 export type AlertStatus = 'OPEN' | 'IN_ANALYSIS' | 'ESCALATED' | 'FALSE_POSITIVE' | 'CLOSED'
 
-/** AlertResponse (backend). Campos opcionais ainda não existem no DTO real. */
+/** AlertResponse (backend). `partyDocument` já vem mascarado. */
 export interface Alert {
   id: UUID
   partyId: UUID | null
   partyName: string | null
+  partyDocument: string | null
   type: string
   severity: Severity
   status: AlertStatus
@@ -23,17 +25,13 @@ export interface Alert {
   totalAmount: number | null
   falsePositiveReason: string | null
   createdAt: ISODateTime
-  /** spec 033: documento mascarado da parte (não existe no DTO real) */
-  partyDocument?: string | null
-  /** spec 046 §6 */
-  cc4001Indicator?: string | null
 }
 
-/** Uma linha de evidência: parâmetro da regra vs. valor observado (spec 046 §6 evidence_snapshot). */
+/** Uma linha de evidência: parâmetro da regra vs. valor observado (snapshot do disparo). */
 export interface AlertEvidenceItem {
   parameter: string
-  label?: string
-  threshold?: string | number | null
+  label: string | null
+  threshold: string | number | null
   observed: string | number | null
 }
 
@@ -42,29 +40,59 @@ export interface AlertHistoryEntry {
   action: string
   fromStatus: string | null
   toStatus: string | null
+  actorId: UUID | null
   actorName: string | null
   justification: string | null
   createdAt: ISODateTime
 }
 
-/**
- * Detalhe do alerta. O backend hoje devolve só `Alert`; evidências, transações vinculadas e histórico
- * (spec 033 "detalhe completo") são opcionais até o endpoint real expô-los.
- */
-export interface AlertDetail extends Alert {
-  evidence?: AlertEvidenceItem[] | null
-  triggeringTransactionIds?: UUID[] | null
-  history?: AlertHistoryEntry[] | null
+export interface AlertRuleSummary {
+  code: string
+  name: string
+  version: number
+  category: string
+  severity: string
+  carta4001Reference: string | null
 }
 
+export interface AlertPartySummary {
+  id: UUID
+  name: string
+  type: string
+  /** mascarado */
+  document: string | null
+  riskLevel: string | null
+  riskScore: number | null
+  pep: boolean
+  pepStatus: string | null
+  eddRequired: boolean
+  assetFreezeActive: boolean
+  status: string
+}
+
+/** AlertDetailResponse: `AlertResponse` + evidências, transações, histórico, regra e parte. */
+export interface AlertDetail extends Alert {
+  evidence: AlertEvidenceItem[] | null
+  /** mapa bruto do disparo */
+  evidenceSnapshot: Record<string, unknown> | null
+  triggeringTransactionIds: UUID[] | null
+  transactions: TransactionSummary[] | null
+  history: AlertHistoryEntry[] | null
+  rule: AlertRuleSummary | null
+  party: AlertPartySummary | null
+}
+
+/** Valores múltiplos vão separados por vírgula (o backend aceita repetidos ou CSV). */
 export interface AlertFilters {
-  status?: AlertStatus
-  severity?: Severity
+  status?: string
+  severity?: string
   type?: string
   assignedTo?: UUID
+  /** AAAA-MM-DD (fuso de Brasília); `to` é inclusivo até o fim do dia */
   from?: string
   to?: string
   partyId?: UUID
+  ruleCode?: string
 }
 
 export interface FalsePositiveRequest {
@@ -73,7 +101,14 @@ export interface FalsePositiveRequest {
   justification: string
 }
 
-/** Spec 033 prevê POST /alerts/{id}/escalate; ainda não existe no backend. Corpo é proposta nossa. */
 export interface AlertEscalateRequest {
   justification: string
+}
+
+export interface AlertComment {
+  id: UUID
+  authorId: UUID
+  authorName: string
+  text: string
+  createdAt: ISODateTime
 }

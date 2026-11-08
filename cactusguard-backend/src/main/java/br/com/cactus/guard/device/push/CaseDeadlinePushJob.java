@@ -29,14 +29,12 @@ public class CaseDeadlinePushJob {
     private final PushRecipientResolver resolver;
     private final PushDispatcher dispatcher;
     private final BusinessCalendar calendar;
+    private final br.com.cactus.guard.tenant.service.TenantRunner tenantRunner;
 
     @Scheduled(cron = "${cactus.push.sla-cron:0 0 8 * * *}", zone = "America/Sao_Paulo")
     public void run() {
-        try {
-            runOnce(LocalDate.now(BusinessCalendar.BRAZIL));
-        } catch (RuntimeException e) {
-            log.warn("Job de push de prazos falhou: {}", e.getClass().getSimpleName());
-        }
+        LocalDate today = LocalDate.now(BusinessCalendar.BRAZIL);
+        tenantRunner.forEachActiveTenant("CaseDeadlinePushJob", tenantId -> runOnce(today));
     }
 
     /** Visivel para teste. Retorna quantos cases foram notificados. */

@@ -104,7 +104,7 @@ class PushDispatchTest {
         INVALID.add(tBad);
 
         UUID caseId = UUID.randomUUID();
-        listener.onCasePendingApproval(new CasePendingApprovalEvent(caseId, dUser.getId()));
+        listener.onCasePendingApproval(new CasePendingApprovalEvent(caseId, dUser.getId(), br.com.cactus.guard.tenant.TenantContext.DEFAULT_TENANT_ID));
 
         awaitSent(tOther);
         List<String> tokens = SENT.stream().map(Sent::token).toList();

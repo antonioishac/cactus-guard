@@ -26,6 +26,10 @@ public class RefreshToken {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    /** Tenant do usuario (V34). Tabela sem RLS: o refresh chega sem tenant e este campo o informa. */
+    @Column(name = "tenant_id", nullable = false, updatable = false)
+    private UUID tenantId;
+
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 

@@ -11,12 +11,13 @@ const DEFAULT_MIN_JUSTIFICATION = 20
 /** Conta caracteres não brancos, como o backend (Justifications.require). */
 const nonBlankLength = (s: string) => s.replace(/\s/g, '').length
 
-function buildJustificationSchema(minLength: number, withReason: boolean) {
+function buildJustificationSchema(minLength: number, withReason: boolean, maxLength?: number) {
   return z.object({
     justification: z
       .string()
       .refine((v) => v.trim().length > 0, 'A justificativa é obrigatória.')
-      .refine((v) => v.trim().length === 0 || nonBlankLength(v) >= minLength, `Informe ao menos ${minLength} caracteres.`),
+      .refine((v) => v.trim().length === 0 || nonBlankLength(v) >= minLength, `Informe ao menos ${minLength} caracteres.`)
+      .refine((v) => maxLength === undefined || v.trim().length <= maxLength, `Máximo de ${maxLength} caracteres.`),
     reason: withReason
       ? z.string().trim().min(1, 'O motivo é obrigatório.').max(100, 'Máximo de 100 caracteres.')
       : z.string().optional(),
@@ -36,6 +37,8 @@ interface Props {
   confirmLabel: string
   /** mínimo de caracteres não brancos (padrão 20) */
   minLength?: number
+  /** máximo de caracteres da justificativa (sem limite por padrão) */
+  maxLength?: number
   /** pede também um motivo curto (ex.: falso positivo) */
   reasonLabel?: string
   tone?: 'primary' | 'danger'
@@ -53,6 +56,7 @@ export function JustificationDialog({
   description,
   confirmLabel,
   minLength = DEFAULT_MIN_JUSTIFICATION,
+  maxLength,
   reasonLabel,
   tone = 'primary',
   onCancel,
@@ -60,7 +64,7 @@ export function JustificationDialog({
 }: Props) {
   const uid = useId()
   const withReason = !!reasonLabel
-  const schema = buildJustificationSchema(minLength, withReason)
+  const schema = buildJustificationSchema(minLength, withReason, maxLength)
   const {
     register,
     handleSubmit,
@@ -119,6 +123,7 @@ export function JustificationDialog({
           <textarea
             id={`${uid}-just`}
             rows={4}
+            maxLength={maxLength}
             {...register('justification')}
             aria-invalid={!!errors.justification}
             aria-describedby={errors.justification ? `${uid}-just-err` : undefined}

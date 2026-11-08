@@ -47,10 +47,12 @@ public class UserService {
     private final AuditService auditService;
     private final RefreshTokenRepository refreshTokenRepository;
     private final CurrentUserService currentUser;
+    private final br.com.cactus.guard.tenant.service.TenantDirectory tenantDirectory;
 
     @Transactional
     public UserResponse create(UserCreateRequest request) {
-        if (userRepository.existsByUsername(request.getUsername())) {
+        // username e unico GLOBALMENTE (identifica o tenant no login); a busca precisa enxergar todos os tenants
+        if (tenantDirectory.findTenantIdByUsername(request.getUsername()).isPresent()) {
             throw new IllegalArgumentException("Username already exists");
         }
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -155,7 +157,7 @@ public class UserService {
     }
 
     /** 16 caracteres com maiuscula, minuscula, digito e simbolo (SecureRandom; sem caracteres ambiguos). */
-    static String generatePassword() {
+    public static String generatePassword() {
         String all = UPPER + LOWER + DIGITS + SYMBOLS;
         List<Character> chars = new ArrayList<>();
         for (String set : new String[]{UPPER, LOWER, DIGITS, SYMBOLS}) {

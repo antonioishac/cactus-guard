@@ -2,85 +2,94 @@ import type { ISODateTime, UUID } from './common'
 import type { Severity } from './alerts'
 
 /**
- * Status reais do CaseService: OPEN, ESCALATED, PENDING_APPROVAL, COMMUNICATE (aprovado p/ comunicar),
- * ARCHIVED. A spec 033 fala em IN_ANALYSIS e CLOSED; mantidos na união para tolerar a convergência.
+ * Status do CaseService. `CLOSED` não é usado: encerramento = ARCHIVED ou COMMUNICATED.
+ * `COMMUNICATE` = decisão de comunicar aprovada (aguarda envio ao COAF).
  */
-export type CaseStatus =
-  | 'OPEN'
-  | 'IN_ANALYSIS'
-  | 'ESCALATED'
-  | 'PENDING_APPROVAL'
-  | 'COMMUNICATE'
-  | 'ARCHIVED'
-  | 'CLOSED'
+export type CaseStatus = 'OPEN' | 'IN_ANALYSIS' | 'ESCALATED' | 'PENDING_APPROVAL' | 'COMMUNICATE' | 'COMMUNICATED' | 'ARCHIVED'
 
 export type CaseDecision = 'COMMUNICATE' | 'ARCHIVE'
 
+/** Calculado no backend pelo prazo regulatório vigente; `null` em case encerrado. */
 export type SlaStatus = 'ON_TIME' | 'DUE_SOON' | 'OVERDUE'
 
+/** CaseResponse (backend). */
 export interface Case {
   id: UUID
+  /** CG-AAAA-NNNNNN */
+  caseNumber: string | null
   alertId: UUID | null
   partyId: UUID | null
   partyName: string | null
+  /** nível de risco da parte */
+  partyRiskLevel: string | null
   status: CaseStatus
   priority: Severity | string
   assignedToId: UUID | null
   decision: CaseDecision | null
   decisionJustification: string | null
+  decidedById: UUID | null
   decidedAt: ISODateTime | null
   slaDueDate: ISODateTime | null
+  slaStatus: SlaStatus | null
   occurredAt: ISODateTime | null
+  selectionDeadline: ISODateTime | null
   selectedAt: ISODateTime | null
   analysisDeadline: ISODateTime | null
   communicationDeadline: ISODateTime | null
   escalationLevel: number
   edd: boolean
+  /** indícios Carta 4.001 */
+  indicatorCodes: string[] | null
+  totalAmountInvolved: number | null
   approvedById: UUID | null
   approvedAt: ISODateTime | null
   closedAt: ISODateTime | null
   createdAt: ISODateTime
-  /** NÃO existe no CaseResponse real. Necessário p/ ocultar "Aprovar" ao decisor (spec 025). */
-  decidedById?: UUID | null
-  /** spec 033 (filtro slaStatus) — ainda não retornado */
-  slaStatus?: SlaStatus
-  caseNumber?: string | null
-  /** indícios Carta 4.001 / códigos de regra (entity Case.indicatorCodes) */
-  indicatorCodes?: string[] | null
-  totalAmountInvolved?: number | null
 }
 
+/** Múltiplos status vão separados por vírgula. */
 export interface CaseFilters {
-  status?: CaseStatus
+  status?: string
   assignedTo?: UUID
   slaStatus?: SlaStatus
+  /** LOW|MEDIUM|HIGH|CRITICAL (nível de risco da parte) ou PEP */
   riskCategory?: string
+  isEdd?: boolean
   from?: string
   to?: string
   partyId?: UUID
 }
 
-export interface CaseDecisionRequest {
-  decision: CaseDecision
-  /** obrigatória, mínimo 20 caracteres não brancos (Justifications.require) */
+/** POST /cases (substitui o alias legado /cases/from-alert/{id}). */
+export interface CaseCreateRequest {
+  alertId: UUID
+  /** >= 20 caracteres não brancos */
   justification: string
 }
 
-/** Backend: `justification` (obrigatória) + `escalatedToId`. Spec 033: `reason` + `targetRole`. */
+export interface CaseDecisionRequest {
+  decision: CaseDecision
+  /** obrigatória, mínimo 20 caracteres não brancos */
+  justification: string
+}
+
 export interface CaseEscalationRequest {
   justification: string
   escalatedToId?: UUID
 }
 
-/** Backend: `{ comment }` opcional. Spec 033: `{ approved, justification }` (rejeição ainda não existe). */
 export interface CaseApprovalRequest {
   comment?: string
 }
 
-/* ---- Itens do dossiê sem endpoint no backend ainda (contrato proposto) ---- */
+/** Rejeição da aprovação (quatro olhos): o case volta a IN_ANALYSIS com a decisão pendente limpa. */
+export interface CaseRejectApprovalRequest {
+  justification: string
+}
 
 export interface CaseNote {
   id: UUID
+  authorId: UUID
   authorName: string
   text: string
   createdAt: ISODateTime
@@ -89,8 +98,11 @@ export interface CaseNote {
 export interface CaseEvidence {
   id: UUID
   fileName: string
+  contentType: string
   sizeBytes: number
   sha256: string
+  description: string | null
+  uploadedById: UUID
   uploadedByName: string
   uploadedAt: ISODateTime
 }

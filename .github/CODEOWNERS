@@ -1,0 +1,16 @@
+# Donos de código — exigem revisão quando "Require review from Code Owners" estiver ativo em main.
+# A última regra que casa vence. Trocar o placeholder pelo time (@org/time) quando houver organização.
+
+*                                   @antonioishac
+
+# Cadeia de suprimentos e CI/CD (mudança aqui altera os próprios controles de segurança)
+/.github/                           @antonioishac
+/.gitleaks.toml                     @antonioishac
+/SECURITY.md                        @antonioishac
+/docs/engenharia/                   @antonioishac
+/cactusguard-backend/Dockerfile     @antonioishac
+/cactusguard-backend/pom.xml        @antonioishac
+
+# Áreas reguladas (revisão de compliance)
+/cactusguard-backend/src/main/resources/db/migration/   @antonioishac
+/specs/                             @antonioishac

@@ -1,0 +1,90 @@
+# Dependabot — atualizações de versão semanais, minor/patch agrupados por ecossistema.
+# Atualizações de SEGURANÇA (advisories) são abertas à parte e não esperam a janela semanal
+# (habilitar em Settings > Code security > Dependabot security updates).
+# `cooldown`: só propõe versão publicada há N dias (reduz exposição a pacote malicioso recém-publicado;
+# não se aplica a security updates).
+version: 2
+
+updates:
+  - package-ecosystem: maven
+    directory: /cactusguard-backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 5
+    labels: [dependencies, backend]
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      maven-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /cactusguard-web
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 5
+    labels: [dependencies, web]
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      npm-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: pub
+    directory: /cactusguard-mobile
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 10
+    cooldown:
+      default-days: 5
+    labels: [dependencies, mobile]
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      pub-minor-patch:
+        update-types: [minor, patch]
+
+  # Actions fixadas por SHA: o Dependabot atualiza o SHA e o comentário "# vX.Y.Z".
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    cooldown:
+      default-days: 5
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]
+
+  # Imagens base do Dockerfile (fixadas por digest: o Dependabot atualiza tag + digest).
+  - package-ecosystem: docker
+    directory: /cactusguard-backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: America/Sao_Paulo
+    labels: [dependencies, docker]
+    commit-message:
+      prefix: "build(docker)"
+    groups:
+      docker-minor-patch:
+        update-types: [minor, patch]

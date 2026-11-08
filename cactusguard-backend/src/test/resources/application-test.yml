@@ -41,3 +41,12 @@ integrations:
     provider: mock
   kyc:
     provider: mock
+
+# Multi-tenancy: testes legados nao definem tenant; rodam no tenant "default" (mesmo UUID fixo da V33).
+# Em dev/prod NAO existe fallback (sem tenant = fail-closed).
+cactus:
+  events:
+    # Testes unitarios (H2, sem Kafka): publisher vira noop; ITs de eventos ligam por DynamicPropertySource
+    enabled: false
+  tenant:
+    fallback-id: 00000000-0000-0000-0000-000000000001

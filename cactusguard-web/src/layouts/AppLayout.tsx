@@ -65,7 +65,7 @@ export default function AppLayout() {
               </span>
               <div className="hidden text-left leading-tight sm:block">
                 <p className="text-sm font-medium">{user?.name}</p>
-                <p className="text-xs text-muted">{user?.roles.join(', ')}</p>
+                <p className="text-xs text-muted">{user?.roles.join(', ')}{user?.tenantName ? ` · ${user.tenantName}` : ''}</p>
               </div>
             </div>
             <button onClick={() => void endSession('logout')} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm hover:bg-neutral-bg">

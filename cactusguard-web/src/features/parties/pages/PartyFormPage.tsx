@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { errorMessage } from '@/api/errors'
+import { toApiError } from '@/api/errors'
 import type { Party } from '@/api/types'
 import { Button } from '@/components/ui/Button'
 import { ErrorState, Skeleton } from '@/components/ui/Feedback'
@@ -67,10 +67,16 @@ function PartyForm({ party }: { party?: Party }) {
 
   const submit = handleSubmit(async (v) => {
     try {
-      const saved = editing ? await update.mutateAsync(toRequest(v)) : await create.mutateAsync(toRequest(v))
+      const saved = editing ? await update.mutateAsync(toRequest(v, true)) : await create.mutateAsync(toRequest(v))
       void navigate(`/partes/${saved.id}`)
     } catch (err) {
-      setError('root', { message: errorMessage(err) })
+      const apiErr = toApiError(err)
+      // erros de validação por campo (VALIDATION_ERROR/fieldErrors) aparecem junto ao campo
+      const known = apiErr.fieldErrors.filter((fe) => fe.field in v)
+      known.forEach((fe) => setError(fe.field as keyof PartyFormValues, { message: fe.message }))
+      if (known.length === 0 || apiErr.code !== 'VALIDATION_ERROR') {
+        setError('root', { message: apiErr.traceId ? `${apiErr.message} (ref. ${apiErr.traceId})` : apiErr.message })
+      }
     }
   })
 

@@ -1,5 +1,8 @@
 package br.com.cactus.guard.siscoaf.service;
 
+import br.com.cactus.guard.event.dto.DomainEventType;
+import br.com.cactus.guard.event.service.DomainEventPublisher;
+import br.com.cactus.guard.event.service.EventPayloads;
 import br.com.cactus.guard.audit.service.AuditService;
 import br.com.cactus.guard.auth.entity.User;
 import br.com.cactus.guard.case_.entity.Case;
@@ -47,6 +50,7 @@ public class SiscoafService {
     private final SiscoafOrchestrator orchestrator;
     private final AuditService auditService;
     private final CurrentUserService currentUser;
+    private final DomainEventPublisher events;
 
     @Transactional
     public SiscoafResponse createDraft(UUID caseId, String type, Map<String, Object> payload) {
@@ -70,6 +74,7 @@ public class SiscoafService {
         record(comm, "CREATED", null, "DRAFT", null);
         AuditPayload.log(auditService, "SISCOAF_DRAFT_CREATED", "SISCOAF_COMMUNICATION", comm.getId(), null,
                 Map.of("type", type, "caseId", caseId.toString()));
+        events.publish(DomainEventType.COMMUNICATION_CREATED, comm.getId(), EventPayloads.communication(comm));
         return toListResponse(comm);
     }
 
@@ -153,6 +158,7 @@ public class SiscoafService {
         comm.setSubmittedAt(now);
         comm = repository.save(comm);
         record(comm, "SUBMIT", fromStatus, comm.getStatus(), just);
+        events.publish(DomainEventType.COMMUNICATION_SUBMITTED, comm.getId(), EventPayloads.communication(comm));
 
         if (linked != null && "COMMUNICATE".equals(linked.getStatus())) {
             linked.setStatus("COMMUNICATED");

@@ -76,7 +76,7 @@ Decisões das specs que **ainda não existem no código** (bloqueiam comercializ
 
 | Item | Spec | Status |
 |---|---|---|
-| Multi-tenancy (`tenant_id` + filtro Hibernate + RLS) | 047, 015, 002 | Pendente — nenhuma entidade tem `tenant_id` |
+| Multi-tenancy (`tenant_id` + `@TenantId` Hibernate + RLS) | 047, 015, 002 | **Implementado** (V33–V38; `TenantIsolationIT`) — ver 047 para papéis de banco em produção e riscos residuais |
 | Eventos de domínio em Kafka (DLQ, retry, reprocesso) | 047 | Pendente — sem Kafka no código |
 | Retenção de 10 anos | 003 | **Divergente** — `job/DataRetentionJob` apaga AuditLog/DataAccessLog após 5 anos (deveria ser ≥ 10 e não apagar trilha de auditoria) |
 | Decisão `COMMUNICATE \| ARCHIVE` + `/escalate` + `/approve` | 033, 012 | Pendente — código aceita `APPROVED/REJECTED/ESCALATED` |

@@ -5,9 +5,11 @@ import {
   decideCase,
   escalateCase,
   getCase,
+  getCaseDossier,
   listCaseEvidences,
   listCaseNotes,
   listCases,
+  rejectCaseApproval,
   uploadCaseEvidence,
 } from '@/api/cases'
 import type { CaseDecision, CaseFilters, PageParams, UUID } from '@/api/types'
@@ -18,7 +20,9 @@ export const useCases = (filters: CaseFilters, paging: PageParams) =>
 export const useCase = (id: UUID | undefined) =>
   useQuery({ queryKey: ['cases', 'detail', id], queryFn: () => getCase(id!), enabled: !!id })
 
-// Notas e evidências ainda não têm endpoint no backend: sem retry, a seção mostra "indisponível".
+export const useCaseDossier = (id: UUID | undefined) =>
+  useQuery({ queryKey: ['cases', id, 'dossier'], queryFn: () => getCaseDossier(id!), enabled: !!id })
+
 export const useCaseNotes = (id: UUID | undefined) =>
   useQuery({ queryKey: ['cases', id, 'notes'], queryFn: () => listCaseNotes(id!), enabled: !!id, retry: false })
 
@@ -52,7 +56,11 @@ export const useEscalateCase = () =>
 export const useApproveCase = () =>
   useCaseAction((v: { id: UUID; justification: string }) => approveCase(v.id, { comment: v.justification }), 'Decisão aprovada.', [['audit']])
 
-export const useAddNote = (id: UUID) => useCaseAction((text: string) => addCaseNote(id, text), 'Nota adicionada.', [['cases', id, 'notes']])
+/** Rejeição da aprovação (quatro olhos): o case volta a IN_ANALYSIS. */
+export const useRejectApproval = () =>
+  useCaseAction((v: { id: UUID; justification: string }) => rejectCaseApproval(v.id, { justification: v.justification }), 'Aprovação rejeitada. O case voltou para análise.', [['audit']])
+
+export const useAddNote = (id: UUID) => useCaseAction((text: string) => addCaseNote(id, text), 'Nota adicionada.', [['cases', id, 'notes'], ['cases', id, 'dossier']])
 
 export const useUploadEvidence = (id: UUID) =>
-  useCaseAction((file: File) => uploadCaseEvidence(id, file), 'Evidência anexada.', [['cases', id, 'evidences']])
+  useCaseAction((v: { file: File; description?: string }) => uploadCaseEvidence(id, v.file, v.description), 'Evidência anexada.', [['cases', id, 'evidences'], ['cases', id, 'dossier']])

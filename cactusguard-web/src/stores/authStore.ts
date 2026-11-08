@@ -72,7 +72,8 @@ export const useAuthStore = create<AuthState>((set) => ({
         username: resp.user.username ?? '',
         name: resp.user.name,
         roles: normalizeRoles(resp.user.roles),
-        permissions: resp.user.permissions ?? [],
+        permissions: [],
+        tenantName: resp.user.tenantName ?? null,
       },
     })
   },

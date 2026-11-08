@@ -1,0 +1,192 @@
+# Segurança de código e cadeia de suprimentos (todo o monorepo):
+#   SAST (CodeQL) · segredos (gitleaks) · dependências/IaC (Trivy fs) · dependency review (PR).
+# Checks obrigatórios na proteção de branch: "codeql (java-kotlin)", "codeql (javascript-typescript)",
+# "codeql (actions)", "gitleaks", "trivy-fs", "dependency-review".
+name: security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1" # segunda 06:17 UTC: pega CVE nova em código parado
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
+
+env:
+  # Imagens das ferramentas fixadas por digest (atualizar junto com o comentário da versão).
+  GITLEAKS_IMAGE: zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+  TRIVY_IMAGE: aquasec/trivy:0.76.2@sha256:8f6bb947dbc528902e11f2f5be52f7b519f6a39d5d148f41166f2040499768fb
+
+jobs:
+  codeql:
+    name: codeql (${{ matrix.language }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      actions: read # exigido pelo CodeQL em repositório privado
+      security-events: write # envio do SARIF ao Security tab
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: java-kotlin
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+          - language: actions # injeção/permissões nos próprios workflows
+            build-mode: none
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - if: ${{ matrix.language == 'java-kotlin' }}
+        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: cactusguard-backend/pom.xml
+
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+          config: |
+            paths-ignore:
+              - "**/node_modules/**"
+              - "**/target/**"
+              - "**/dist/**"
+              - "cactusguard-mobile/build/**"
+
+      - if: ${{ matrix.build-mode == 'manual' }}
+        name: Build Java (compilação para o CodeQL)
+        working-directory: cactusguard-backend
+        run: sh ./mvnw -B -ntp -DskipTests -Djacoco.skip=true -Dcyclonedx.skip=true test-compile
+
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # histórico completo: segredo removido continua exposto no histórico
+
+      # PR: só os commits do PR. push/schedule: histórico inteiro.
+      # Allowlist explícita e comentada em .gitleaks.toml (somente credenciais de dev/teste).
+      - name: gitleaks
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          range=()
+          if [ "$EVENT" = "pull_request" ]; then
+            range=(--log-opts="$BASE_SHA..$HEAD_SHA")
+          fi
+          docker run --rm -v "$GITHUB_WORKSPACE:/repo" "$GITLEAKS_IMAGE" \
+            git /repo --config /repo/.gitleaks.toml --redact --no-banner --verbose \
+            --report-format sarif --report-path /repo/gitleaks.sarif "${range[@]}"
+
+      # Relatório redigido (--redact): nunca contém o valor do segredo.
+      - name: Publicar relatório
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: gitleaks-report
+          path: gitleaks.sarif
+          retention-days: 7
+
+  trivy-fs:
+    name: trivy-fs
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write # envio do SARIF ao Security tab
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # O Trivy resolve as dependências transitivas do pom.xml. Sem ~/.m2 populado ele busca cada POM no
+      # Maven Central e toma HTTP 429 (bloqueio de IP por 30 min). Resolver antes e montar ~/.m2 (só leitura).
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: cactusguard-backend/pom.xml
+
+      - name: Resolver dependências Maven
+        working-directory: cactusguard-backend
+        run: sh ./mvnw -B -ntp -q dependency:go-offline
+
+      - name: Data (chave do cache do banco de vulnerabilidades)
+        id: date
+        run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ runner.temp }}/trivy-cache
+          key: trivy-db-${{ steps.date.outputs.day }}
+          restore-keys: trivy-db-
+
+      # Relatório completo (todas as severidades, vuln + misconfig de Dockerfile/IaC) -> Security tab
+      - name: Trivy fs (SARIF)
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/repo" -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+            -v "$HOME/.m2:/root/.m2:ro" \
+            "$TRIVY_IMAGE" fs --quiet --offline-scan --scanners vuln,misconfig \
+            --config /repo/.github/trivy.yaml \
+            --format sarif --output /repo/trivy-fs.sarif /repo
+
+      - name: Enviar SARIF ao Security tab
+        if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          sarif_file: trivy-fs.sarif
+          category: trivy-fs
+
+      # Gate (política em docs/engenharia/ci-cd.md): falha com CRITICAL ou HIGH que já tenha correção.
+      - name: Trivy fs (gate HIGH/CRITICAL com correção)
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/repo" -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+            -v "$HOME/.m2:/root/.m2:ro" \
+            "$TRIVY_IMAGE" fs --quiet --offline-scan --scanners vuln,misconfig \
+            --config /repo/.github/trivy.yaml \
+            --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --format table /repo
+
+  dependency-review:
+    name: dependency-review
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Política em .github/dependency-review-config.yml (HIGH+ e copyleft forte bloqueiam)
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          config-file: ./.github/dependency-review-config.yml

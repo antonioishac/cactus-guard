@@ -19,25 +19,20 @@ export function EmptyState({ title, hint, action }: { title: string; hint?: stri
 }
 
 /**
- * Estado de erro de uma seção. `unavailableOn` lista status HTTP que significam "endpoint ainda não existe /
- * sem permissão" e viram um aviso discreto em vez de erro.
+ * Estado de erro de uma seção. 403 vira aviso discreto de permissão (a UI por role é conveniência);
+ * os demais erros mostram a mensagem do contrato de erro e a referência (`traceId`) para suporte.
  */
 export function ErrorState({ error, onRetry, compact }: { error: unknown; onRetry?: () => void; compact?: boolean }) {
   const e = toApiError(error)
-  const unavailable = e.status === 404 || e.status === 501
   const forbidden = e.status === 403
-  const msg = unavailable
-    ? 'Informação ainda não disponível nesta versão da API.'
-    : forbidden
-      ? 'Seu perfil não tem permissão para ver esta seção.'
-      : e.message
+  const msg = forbidden ? 'Seu perfil não tem permissão para ver esta seção.' : e.message
   return (
-    <div role={unavailable || forbidden ? 'status' : 'alert'} className={`flex items-start gap-2 text-sm ${compact ? 'py-2' : 'py-6 justify-center'} ${unavailable || forbidden ? 'text-muted' : 'text-danger'}`}>
+    <div role={forbidden ? 'status' : 'alert'} className={`flex items-start gap-2 text-sm ${compact ? 'py-2' : 'py-6 justify-center'} ${forbidden ? 'text-muted' : 'text-danger'}`}>
       <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden />
       <div>
         <p>{msg}</p>
-        {e.traceId && !unavailable && <p className="text-xs text-muted">Ref.: {e.traceId}</p>}
-        {onRetry && !unavailable && !forbidden && (
+        {e.traceId && !forbidden && <p className="text-xs text-muted">Ref.: {e.traceId}</p>}
+        {onRetry && !forbidden && (
           <Button variant="secondary" className="mt-2 !px-2 !py-1 text-xs" onClick={onRetry}>
             Tentar novamente
           </Button>

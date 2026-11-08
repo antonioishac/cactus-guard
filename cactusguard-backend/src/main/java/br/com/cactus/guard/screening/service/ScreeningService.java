@@ -1,5 +1,8 @@
 package br.com.cactus.guard.screening.service;
 
+import br.com.cactus.guard.event.dto.DomainEventType;
+import br.com.cactus.guard.event.service.DomainEventPublisher;
+import br.com.cactus.guard.event.service.EventPayloads;
 import br.com.cactus.guard.common.audit.AuditPayload;
 import br.com.cactus.guard.audit.service.DataAccessService;
 
@@ -48,6 +51,7 @@ public class ScreeningService {
     private final AuditService auditService;
     private final CurrentUserService currentUser;
     private final RiskScoringService riskScoring;
+    private final DomainEventPublisher events;
 
     @Async
     @Transactional
@@ -145,6 +149,8 @@ public class ScreeningService {
             audit.put("basis", "Lei 13.810/2019 / Res. BCB 44/2020 - hit CONFIRMED em lista CSNU");
             AuditPayload.log(auditService, "ASSET_FREEZE_ACTIVATED", "PARTY", party.getId(),
                     Map.of("assetFreezeActive", false), audit);
+            events.publish(DomainEventType.ASSET_FREEZE_ACTIVATED, party.getId(), EventPayloads.assetFreezeActivated(
+                    party.getId(), party.getAssetFreezeReference(), result.getId(), result.getListCode()));
         }
 
         Map<String, Object> evidence = new LinkedHashMap<>();

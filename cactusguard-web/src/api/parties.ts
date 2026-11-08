@@ -25,15 +25,12 @@ export async function getParty(id: UUID): Promise<Party> {
 }
 
 /**
- * Lista partes. DIVERGÊNCIA: o backend só tem `GET /parties` (paginado) e `GET /parties/search?q=`;
- * os filtros type/riskLevel/pep/sourceType/document são PROPOSTOS (spec 026/033) e hoje ignorados.
+ * Lista partes com filtros combináveis `q`, `document` (igualdade por HMAC), `type`, `riskLevel`, `pep`, `sourceType`.
  * `q` e `document` são PII em potencial: vão só na requisição, nunca na URL do navegador.
  */
 export async function listParties(filters: PartyFilters, paging: PageParams): Promise<Page<Party>> {
-  const text = filters.q?.trim() || filters.document?.trim()
-  const params = { ...pageQuery(paging), ...cleanParams({ ...filters, q: text }) }
-  const path = text ? '/parties/search' : '/parties'
-  return (await api.get<Page<Party>>(path, { params })).data
+  const params = { ...pageQuery(paging), ...cleanParams({ ...filters, q: filters.q?.trim(), document: filters.document?.trim() }) }
+  return (await api.get<Page<Party>>('/parties', { params })).data
 }
 
 export async function createParty(body: PartyRequest): Promise<Party> {
@@ -41,8 +38,8 @@ export async function createParty(body: PartyRequest): Promise<Party> {
 }
 
 /**
- * ATENÇÃO (divergência crítica): `PUT /parties/{id}` sobrescreve document/email/phone com o que for enviado.
- * Como a UI só conhece valores mascarados, o backend precisa ignorar valores mascarados (contêm `*`).
+ * `PUT /parties/{id}`: o documento é imutável (omitido/mascarado/igual = ignorado; diferente = 422 DOCUMENT_IMMUTABLE)
+ * e email/phone/motherName mascarados (`*`) ou null mantêm o valor atual.
  */
 export async function updateParty(id: UUID, body: PartyRequest): Promise<Party> {
   return (await api.put<Party>(`/parties/${id}`, body)).data
@@ -56,6 +53,11 @@ export async function listRelationships(partyId: UUID): Promise<PartyRelationshi
   return (await api.get<PartyRelationship[]>(`/parties/${partyId}/relationships`)).data
 }
 
+/** `GET /parties/{id}/pep`: situação PEP atual. */
+export async function getPep(partyId: UUID): Promise<PepResponse> {
+  return (await api.get<PepResponse>(`/parties/${partyId}/pep`)).data
+}
+
 /** `POST /parties/{id}/pep`: marca/atualiza PEP (força EDD e risco mínimo HIGH). */
 export async function markPep(partyId: UUID, body: PepRequest): Promise<PepResponse> {
   return (await api.post<PepResponse>(`/parties/${partyId}/pep`, body)).data
@@ -66,14 +68,12 @@ export async function approvePep(partyId: UUID, comment: string): Promise<PepRes
   return (await api.post<PepResponse>(`/parties/${partyId}/pep/approve`, new URLSearchParams({ comment }))).data
 }
 
-/**
- * PROPOSTO: recálculo de risco de UMA parte. O backend só tem `POST /risk/recalculate` (todas as partes, ADMIN).
- */
+/** Recalcula o risco de UMA parte (ANALYST, SUPERVISOR). O global `POST /risk/recalculate` é ADMIN. */
 export async function recalculateRisk(partyId: UUID): Promise<Party> {
   return (await api.post<Party>(`/parties/${partyId}/risk/recalculate`)).data
 }
 
-/** PROPOSTO: revela 1 campo de PII; backend deve registrar DataAccessLog com `reason`. */
+/** Revela PII (ANALYST/SUPERVISOR/AUDITOR; ADMIN recebe 403). Registra data_access_log + REVELACAO: motivo. Resposta `no-store`. */
 export async function revealPartyField(id: UUID, body: RevealRequest): Promise<RevealResponse> {
   return (await api.post<RevealResponse>(`/parties/${id}/reveal`, body)).data
 }

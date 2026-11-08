@@ -9,7 +9,10 @@ export type DeadlineStage = keyof typeof WARN_WINDOW_MS
 const TONE: Record<DeadlineState, Tone> = { ok: 'success', warning: 'warning', overdue: 'danger', done: 'neutral', none: 'neutral' }
 const LABEL: Record<DeadlineState, string> = { ok: 'No prazo', warning: 'Vencendo', overdue: 'Vencido', done: 'Cumprido', none: 'Sem prazo' }
 
-/** Selo de prazo regulatório: texto + cor (não depende só de cor). Cálculo provisório em lib/deadline. */
+/**
+ * Selo de prazo PROVISÓRIO (classificação no cliente). Só resta para o prazo de seleção do alerta e a comunicação
+ * SISCOAF, cujos DTOs ainda não trazem o estado (slaStatus). Cases usam `SlaBadge` (estado do backend).
+ */
 export function DeadlineBadge({ stage, deadline, doneAt }: { stage: DeadlineStage; deadline: string | null | undefined; doneAt?: string | null }) {
   const r = evaluateDeadline({ deadline, doneAt, warnMs: WARN_WINDOW_MS[stage] })
   const label = r.state === 'done' && r.late ? 'Cumprido fora do prazo' : LABEL[r.state]

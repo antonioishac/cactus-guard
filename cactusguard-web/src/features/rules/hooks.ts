@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { approveRule, createRule, getRule, listRules, listRuleVersions, runRuleEngine, toggleRule, updateRule } from '@/api/rules'
+import { approveRule, createRule, getRule, getRuleMetrics, listRules, listRuleVersions, runRuleEngine, toggleRule, updateRule } from '@/api/rules'
 import type { PageParams, RuleFilters, RuleRequest } from '@/api/types'
 
 export const useRules = (filters: RuleFilters, paging: PageParams) =>
@@ -7,6 +7,9 @@ export const useRules = (filters: RuleFilters, paging: PageParams) =>
 
 export const useRule = (code: string | undefined) =>
   useQuery({ queryKey: ['rules', 'detail', code], queryFn: () => getRule(code!), enabled: !!code })
+
+export const useRuleMetrics = (code: string | undefined) =>
+  useQuery({ queryKey: ['rules', code, 'metrics'], queryFn: () => getRuleMetrics(code!), enabled: !!code })
 
 export const useRuleVersions = (code: string | undefined) =>
   useQuery({ queryKey: ['rules', code, 'versions'], queryFn: () => listRuleVersions(code!), enabled: !!code })

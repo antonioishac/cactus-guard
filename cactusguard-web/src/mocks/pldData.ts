@@ -12,6 +12,7 @@ import type {
   PartyAddress,
   PartyRelationship,
   RiskHistoryEntry,
+  ScreeningListInfo,
   ScreeningResult,
   Transaction,
   UserAccount,
@@ -168,7 +169,8 @@ function makeBundle(parties: Party[]) {
         id: `t-${p.id}-${i}`, partyId: p.id, partyName: p.name, type: ['DEPOSIT', 'PIX', 'TED', 'WITHDRAWAL'][i % 4]!, amount: 4500 + i * 3100, currency: 'BRL',
         counterpartyName: 'Contraparte Exemplo SA', counterpartyDocument: '**.987.654/0001-**', channel: ['AGENCIA', 'APP', 'INTERNET_BANKING'][i % 3]!, status: 'COMPLETED',
         transactionDate: iso(-i * D), originCountry: 'BR', destinationCountry: i % 5 === 0 ? 'KY' : 'BR', purpose: null, direction: i % 2 === 0 ? 'IN' : 'OUT', cash: i % 4 === 0,
-        amountBrl: 4500 + i * 3100, createdAt: iso(-i * D), paymentMethod: ['CASH', 'PIX', 'TED', 'CASH'][i % 4], counterpartyCountry: i % 5 === 0 ? 'KY' : 'BR',
+        amountBrl: 4500 + i * 3100, createdAt: iso(-i * D), paymentMethod: ['CASH', 'PIX', 'TED', 'CASH'][i % 4]!, counterpartyCountry: i % 5 === 0 ? 'KY' : 'BR',
+        endToEndId: i % 4 === 1 ? `E00038166${String(idx).padStart(2, '0')}2026110${i}0900abc` : null, externalReference: null,
       })
     }
     if (idx < 8) {
@@ -187,8 +189,8 @@ function makeBundle(parties: Party[]) {
   ubo[PARTY_PJ] = structuredClone(uboMain)
   ubo[PARTY_RECENT_PJ] = [{ id: 'ubo-9', ownerDocument: '***.555.666-**', ownerName: 'Rogério Faria', ownershipPct: 100, controlType: 'PARTICIPACAO', pep: false, finalBeneficiary: true, indirect: false, nationality: 'BR', validFrom: '2025-09-01', validTo: null, ownerType: 'PF' }]
   relationships[PARTY_PF] = [
-    { id: 'rel-1', relatedParty: { id: 'p-0007', name: 'Luciana Carvalho', type: 'PF', pep: false, pepStatus: 'RELATED' }, relationshipType: 'CONJUGE', description: 'Cônjuge do PEP', active: true, validFrom: '2021-01-04', validTo: null },
-    { id: 'rel-2', relatedParty: { id: PARTY_PJ, name: 'Alfa Comércio e Serviços Ltda', type: 'PJ', pep: false, pepStatus: 'NONE' }, relationshipType: 'SOCIO', description: 'Sócio minoritário', active: false, validFrom: '2019-03-01', validTo: '2022-12-31' },
+    { id: 'rel-1', relatedParty: { id: 'p-0007', name: 'Luciana Carvalho', type: 'PF', document: '***.222.333-**', pep: false, pepStatus: 'RELATED', riskLevel: 'MEDIUM' }, relationshipType: 'CONJUGE', description: 'Cônjuge do PEP', active: true, validFrom: '2021-01-04', validTo: null, details: null },
+    { id: 'rel-2', relatedParty: { id: PARTY_PJ, name: 'Alfa Comércio e Serviços Ltda', type: 'PJ', document: '**.123.456/0001-**', pep: false, pepStatus: 'NONE', riskLevel: 'MEDIUM' }, relationshipType: 'SOCIO', description: 'Sócio minoritário', active: false, validFrom: '2019-03-01', validTo: '2022-12-31', details: null },
   ]
   return { addresses, relationships, ubo, risk, transactions, kyc, checklist, documents }
 }
@@ -196,6 +198,7 @@ function makeBundle(parties: Party[]) {
 function makeHits(): ScreeningResult[] {
   const mk = (id: string, partyId: string, partyName: string, listCode: string, matchedName: string, score: number, type: string, status: string, freeze = false): ScreeningResult => ({
     id, partyId, partyName, listCode, matchedName, matchedDocument: null, matchScore: score, matchType: type, status, createdAt: iso(-3 * D), requiresAssetFreeze: freeze,
+    reviewJustification: null, reviewedAt: null, reviewedByName: null,
   })
   return [
     { ...mk('s-1', PARTY_PF, 'João da Silva Santos', 'PEP', 'João da Silva Santos', 98.5, 'EXACT', 'CONFIRMED'), matchedDocument: '***.456.789-**', reviewJustification: 'Confirmado em fonte oficial (diário do município).', reviewedAt: iso(-29 * D), reviewedByName: 'Ana Martins' },
@@ -226,8 +229,21 @@ function makeUsers(): UserAccount[] {
   ]
 }
 
+function makeLists(): ScreeningListInfo[] {
+  const l = (code: string, name: string, type: string, source: string, freeze = false, lastUpdated: string | null = iso(-2 * D)): ScreeningListInfo => ({ code, name, type, source, requiresAssetFreeze: freeze, active: true, lastUpdated })
+  return [
+    l('PEP', 'PEP (pessoas expostas politicamente)', 'PEP', 'Interna + provedores'),
+    l('SANCTIONS', 'Sanções consolidadas', 'SANCTIONS', 'OFAC, ONU, UE'),
+    l('OFAC', 'OFAC (EUA)', 'SANCTIONS', 'US Treasury'),
+    l('CSNU', 'ONU / CSNU', 'SANCTIONS', 'Conselho de Segurança da ONU', true),
+    l('GAFI', 'GAFI: jurisdições de alto risco', 'JURISDICTION', 'FATF/GAFI'),
+    { ...l('EU', 'União Europeia', 'SANCTIONS', 'EU Consolidated List'), active: false },
+  ]
+}
+
 export interface PldDb {
   parties: Party[]
+  lists: ScreeningListInfo[]
   hits: ScreeningResult[]
   watchlist: WatchlistEntry[]
   users: UserAccount[]
@@ -235,11 +251,13 @@ export interface PldDb {
   /** log de ações para asserções em testes */
   reviews: { id: string; status: string; justification: string }[]
   pepApprovals: { partyId: string; comment: string; by: string }[]
+  /** usuários cujo reset de senha foi pedido (a senha NUNCA é guardada) */
+  passwordResets: { userId: string; generated: boolean }[]
 }
 
 function initial(): PldDb {
   const parties = makeParties()
-  return { parties, hits: makeHits(), watchlist: makeWatchlist(), users: makeUsers(), bundle: makeBundle(parties), reviews: [], pepApprovals: [] }
+  return { parties, lists: makeLists(), hits: makeHits(), watchlist: makeWatchlist(), users: makeUsers(), bundle: makeBundle(parties), reviews: [], pepApprovals: [], passwordResets: [] }
 }
 
 export const pld: PldDb = initial()

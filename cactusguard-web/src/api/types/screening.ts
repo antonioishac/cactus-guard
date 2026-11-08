@@ -3,7 +3,7 @@ import type { ISODateTime, UUID } from './common'
 export const SCREENING_STATUSES = ['PENDING', 'CONFIRMED', 'FALSE_POSITIVE'] as const
 export type ScreeningStatus = (typeof SCREENING_STATUSES)[number]
 
-/** ScreeningResultResponse do backend. `partyName`/`requiresAssetFreeze`/revisão são PROPOSTOS (opcionais). */
+/** ScreeningResultResponse (backend). */
 export interface ScreeningResult {
   id: UUID
   partyId: UUID
@@ -14,14 +14,20 @@ export interface ScreeningResult {
   matchType: string
   status: string
   createdAt: ISODateTime
-  partyName?: string | null
-  requiresAssetFreeze?: boolean
-  reviewJustification?: string | null
-  reviewedAt?: ISODateTime | null
-  reviewedByName?: string | null
+  partyName: string | null
+  requiresAssetFreeze: boolean
+  reviewJustification: string | null
+  reviewedAt: ISODateTime | null
+  reviewedByName: string | null
 }
 
-/** Listas de screening (spec 011). `code` é o valor enviado em `lists`. Endpoint de catálogo é PROPOSTO. */
+/** POST /screening/{id}/review (JSON). Justificativa >= 20 caracteres não brancos. */
+export interface ScreeningReviewRequest {
+  status: 'CONFIRMED' | 'FALSE_POSITIVE'
+  justification: string
+}
+
+/** GET /screening/lists: catálogo real. `code` é o valor enviado em `lists`. */
 export interface ScreeningListInfo {
   code: string
   name: string
@@ -32,7 +38,7 @@ export interface ScreeningListInfo {
   lastUpdated: ISODateTime | null
 }
 
-/** Entity WatchlistEntry (lista interna) serializada direto. `document` pode vir mascarado. */
+/** WatchlistEntry (lista interna). `document` pode vir mascarado. O backend ainda serializa a entity. */
 export interface WatchlistEntry {
   id: UUID
   document: string

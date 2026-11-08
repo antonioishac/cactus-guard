@@ -91,12 +91,14 @@ Infra local (containers administrados fora deste repositório):
 
 Usuários de dev (criados por `db/dev/R__dev_users.sql`, só no perfil dev):
 
-| Usuário | Senha | Perfil |
-|---|---|---|
-| `admin` | `admin123` | ADMIN |
-| `analista` | `dev12345` | ANALYST |
-| `supervisor` / `supervisor2` | `dev12345` | SUPERVISOR (2 para testar quatro olhos) |
-| `auditor` | `dev12345` | AUDITOR |
+| Usuário | Senha | Perfil | Tenant |
+|---|---|---|---|
+| `admin` | `admin123` | ADMIN | default |
+| `analista` | `dev12345` | ANALYST | default |
+| `supervisor` / `supervisor2` | `dev12345` | SUPERVISOR (2 para testar quatro olhos) | default |
+| `auditor` | `dev12345` | AUDITOR | default |
+| `analista2` | `dev12345` | ANALYST | demo2 (2º tenant: testar isolamento) |
+| `platform` | `dev12345` | PLATFORM_ADMIN | platform (gestão de tenants; sem dados de negócio) |
 
 | Variável (opcional) | Padrão de dev |
 |---|---|

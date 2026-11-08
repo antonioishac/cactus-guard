@@ -1,13 +1,13 @@
 import { useState } from 'react'
-import { ArrowUpRight, Archive, BadgeCheck, Megaphone } from 'lucide-react'
+import { ArrowUpRight, Archive, BadgeCheck, Megaphone, Undo2 } from 'lucide-react'
 import type { Case, CaseDecision } from '@/api/types'
 import { Button } from '@/components/ui/Button'
 import { JustificationDialog } from '@/components/ui/JustificationDialog'
 import { useAuth } from '@/features/auth/useAuth'
-import { useApproveCase, useDecideCase, useEscalateCase } from '../hooks'
+import { useApproveCase, useDecideCase, useEscalateCase, useRejectApproval } from '../hooks'
 import { isActionable, isOwnDecision, isPendingApproval } from '../ui-rules'
 
-type Dialog = { kind: 'decide'; decision: CaseDecision } | { kind: 'escalate' } | { kind: 'approve' } | null
+type Dialog = { kind: 'decide'; decision: CaseDecision } | { kind: 'escalate' } | { kind: 'approve' } | { kind: 'reject' } | null
 
 const DECISION_COPY: Record<CaseDecision, { title: string; description: string; confirm: string }> = {
   COMMUNICATE: {
@@ -29,6 +29,7 @@ export function CaseActions({ c }: { c: Case }) {
   const decide = useDecideCase()
   const escalate = useEscalateCase()
   const approve = useApproveCase()
+  const reject = useRejectApproval()
 
   const actionable = isActionable(c)
   const pending = isPendingApproval(c)
@@ -57,10 +58,15 @@ export function CaseActions({ c }: { c: Case }) {
             <BadgeCheck size={16} aria-hidden /> Aprovar decisão
           </Button>
         )}
+        {can('case:reject') && pending && !own && (
+          <Button variant="secondary" onClick={() => setDialog({ kind: 'reject' })}>
+            <Undo2 size={16} aria-hidden /> Rejeitar aprovação
+          </Button>
+        )}
       </div>
       {can('case:approve') && pending && own && (
         <p role="note" className="mt-2 text-sm text-warning">
-          Você propôs esta decisão. A aprovação deve ser feita por outro supervisor (quatro olhos).
+          Você propôs esta decisão. Aprovar ou rejeitar deve ser feito por outro supervisor (quatro olhos).
         </p>
       )}
 
@@ -85,6 +91,18 @@ export function CaseActions({ c }: { c: Case }) {
         onCancel={() => setDialog(null)}
         onConfirm={async ({ justification }) => {
           await escalate.mutateAsync({ id: c.id, justification })
+          setDialog(null)
+        }}
+      />
+      <JustificationDialog
+        open={dialog?.kind === 'reject'}
+        title="Rejeitar aprovação (quatro olhos)"
+        description={`A decisão proposta (${c.decision === 'COMMUNICATE' ? 'Comunicar' : 'Arquivar'}) será descartada e o case volta para análise, aceitando nova decisão. Os prazos continuam correndo. O decisor será notificado.`}
+        confirmLabel="Rejeitar aprovação"
+        tone="danger"
+        onCancel={() => setDialog(null)}
+        onConfirm={async ({ justification }) => {
+          await reject.mutateAsync({ id: c.id, justification })
           setDialog(null)
         }}
       />

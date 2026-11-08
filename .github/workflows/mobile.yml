@@ -1,0 +1,65 @@
+# Mobile (Flutter): analyze, testes e build web (verificação de compilação, modo mock).
+# Check obrigatório na proteção de branch: "mobile-checks".
+name: mobile
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cactusguard-mobile/**"
+      - ".github/workflows/mobile.yml"
+  # Sem `paths` em PR de propósito: ver _changes.yml (check obrigatório não pode ficar pendente).
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions: {}
+
+defaults:
+  run:
+    working-directory: cactusguard-mobile
+
+jobs:
+  changes:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_changes.yml
+    with:
+      pattern: '^(cactusguard-mobile/|\.github/workflows/(mobile|_changes)\.yml$)'
+
+  checks:
+    name: mobile-checks
+    needs: changes
+    if: ${{ needs.changes.outputs.changed == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          flutter-version: "3.44.6"
+          cache: true # SDK + pub cache
+          pub-cache-key: "flutter-pub-:os:-:channel:-:version:-:arch:-${{ hashFiles('cactusguard-mobile/pubspec.lock') }}"
+
+      # --enforce-lockfile: falha se o pubspec.lock não corresponder (build reprodutível)
+      - name: flutter pub get
+        run: flutter pub get --enforce-lockfile
+
+      - name: flutter analyze
+        run: flutter analyze
+
+      - name: flutter test
+        run: flutter test
+
+      # Verificação de compilação; o mock evita qualquer URL real embutida no bundle.
+      - name: flutter build web
+        run: flutter build web --release --dart-define=USE_MOCK=true

@@ -1,0 +1,101 @@
+# Backend (Java 25 / Spring Boot 4): build, unit (H2) + IT (Testcontainers/PostgreSQL), cobertura JaCoCo e SBOM CycloneDX.
+# Check obrigatório na proteção de branch: "backend-verify".
+name: backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cactusguard-backend/**"
+      - ".github/workflows/backend.yml"
+  # Sem `paths` em PR de propósito: ver _changes.yml (check obrigatório não pode ficar pendente).
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Padrão: nenhum privilégio; cada job declara o mínimo.
+permissions: {}
+
+defaults:
+  run:
+    working-directory: cactusguard-backend
+
+jobs:
+  changes:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/_changes.yml
+    with:
+      pattern: '^(cactusguard-backend/|\.github/workflows/(backend|_changes)\.yml$)'
+
+  verify:
+    name: backend-verify
+    needs: changes
+    if: ${{ needs.changes.outputs.changed == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      checks: write # relatório JUnit como check run (mikepenz/action-junit-report)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        with:
+          distribution: temurin
+          java-version: "25"
+          cache: maven
+          cache-dependency-path: cactusguard-backend/pom.xml
+
+      # Unit (surefire, H2) + IT (failsafe, Testcontainers usa o Docker do runner) + JaCoCo + SBOM
+      - name: mvn verify
+        # `sh ./mvnw`: não depende do bit de execução (repositório editado no Windows)
+        run: sh ./mvnw -B -ntp verify
+
+      # PR de fork recebe token só leitura (sem checks: write): o relatório fica só no artefato.
+      - name: Relatório de testes (surefire + failsafe)
+        if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: mikepenz/action-junit-report@a16be3a69023e9bd7e748ede768b3282ea7b30ce # v6.7.1
+        with:
+          check_name: backend-testes
+          report_paths: |
+            cactusguard-backend/target/surefire-reports/TEST-*.xml
+            cactusguard-backend/target/failsafe-reports/TEST-*.xml
+          include_passed: false
+          fail_on_failure: true
+          require_tests: true
+
+      - name: Resumo de cobertura (JaCoCo)
+        if: ${{ !cancelled() && hashFiles('cactusguard-backend/target/site/jacoco/jacoco.csv') != '' }}
+        run: |
+          awk -F, 'NR>1 { lm+=$8; lc+=$9; bm+=$6; bc+=$7 }
+            END {
+              printf "### Cobertura JaCoCo (unit + IT)\n\n| Métrica | Cobertura | Meta inicial |\n|---|---|---|\n"
+              printf "| Linhas | %.1f%% | 80%% (aviso) |\n", (lc+lm ? 100*lc/(lc+lm) : 0)
+              printf "| Branches | %.1f%% | 65%% (aviso) |\n", (bc+bm ? 100*bc/(bc+bm) : 0)
+            }' target/site/jacoco/jacoco.csv >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar relatórios de teste e cobertura
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-test-reports
+          path: |
+            cactusguard-backend/target/surefire-reports/
+            cactusguard-backend/target/failsafe-reports/
+            cactusguard-backend/target/site/jacoco/
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Publicar SBOM CycloneDX (dependências Maven)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: backend-sbom-cyclonedx
+          path: cactusguard-backend/target/classes/META-INF/sbom/application.cdx.json
+          retention-days: 90
+          if-no-files-found: error

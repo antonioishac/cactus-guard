@@ -10,7 +10,7 @@ import lombok.*;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class CaseNumberCounter {
+public class CaseNumberCounter extends br.com.cactus.guard.tenant.TenantScoped {
 
     @Id
     @Column(name = "counter_year")

@@ -11,7 +11,7 @@ import { formatBRL, formatDateTime, severityLabel, statusLabel } from '@/lib/for
 import { useAuth } from '@/features/auth/useAuth'
 import { useAlerts } from '../hooks'
 
-const KEYS = ['status', 'severity', 'type', 'assignedTo', 'from', 'to', 'partyId'] as const
+const KEYS = ['status', 'severity', 'type', 'assignedTo', 'from', 'to', 'partyId', 'ruleCode'] as const
 const STATUSES: AlertStatus[] = ['OPEN', 'IN_ANALYSIS', 'ESCALATED', 'FALSE_POSITIVE', 'CLOSED']
 const SEVERITIES: Severity[] = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW']
 const TYPES = ['TRANSACTIONAL', 'PEP', 'SANCTIONS', 'WATCHLIST', 'BEHAVIORAL']
@@ -58,6 +58,7 @@ export function AlertListPage() {
     from: f.from || undefined,
     to: f.to || undefined,
     partyId: f.partyId || undefined,
+    ruleCode: f.ruleCode || undefined,
   }
   const q = useAlerts(filters, { page: list.page, size: list.size, sort: list.sort })
 
@@ -72,6 +73,7 @@ export function AlertListPage() {
         <TextFilter label="De" type="date" value={f.from} onChange={(v) => list.setFilter('from', v)} />
         <TextFilter label="Até" type="date" value={f.to} onChange={(v) => list.setFilter('to', v)} />
         <TextFilter label="ID da parte" value={f.partyId} onChange={(v) => list.setFilter('partyId', v.trim())} placeholder="UUID" />
+        <TextFilter label="Código da regra" value={f.ruleCode} onChange={(v) => list.setFilter('ruleCode', v.trim())} placeholder="Ex.: STRUCTURING" />
       </FilterBar>
       <DataTable
         caption="Lista de alertas"

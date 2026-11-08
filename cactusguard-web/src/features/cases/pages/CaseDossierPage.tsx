@@ -2,17 +2,16 @@ import { useParams } from 'react-router'
 import { Hourglass } from 'lucide-react'
 import type { Case } from '@/api/types'
 import { Badge, SeverityBadge, StatusBadge } from '@/components/ui/Badge'
-import { DeadlineBadge } from '@/components/ui/DeadlineBadge'
+import { SlaBadge } from '@/components/ui/SlaBadge'
 import { ErrorState, Skeleton } from '@/components/ui/Feedback'
 import { Card, KeyValue, PageHeader } from '@/components/ui/Layout'
-import { useAlert } from '@/features/alerts/hooks'
-import { BeneficialOwnersCard, RiskHistoryCard, ScreeningCard, TransactionsCard } from '@/features/parties/components/PartySections'
+import { BeneficialOwnersCard, RiskHistoryCard, ScreeningCard } from '@/features/parties/components/PartySections'
 import { PartySummaryCard } from '@/features/parties/components/PartySummaryCard'
-import { decisionLabel, formatBRL, formatDateTime } from '@/lib/format'
+import { decisionLabel, formatBRL, formatDateTime, severityLabel } from '@/lib/format'
 import { CaseActions } from '../components/CaseActions'
-import { AuditTrailCard, EvidencesCard, NotesCard } from '../components/DossierExtras'
-import { useCase } from '../hooks'
-import { isFinalCase, isPendingApproval } from '../ui-rules'
+import { AlertEvidenceCard, AuditTrailCard, DossierTransactionsCard, EvidencesCard, NotesCard } from '../components/DossierExtras'
+import { useCase, useCaseDossier } from '../hooks'
+import { currentDeadline, isClosedCase, isPendingApproval } from '../ui-rules'
 
 function PendingApprovalBanner({ c }: { c: Case }) {
   return (
@@ -31,24 +30,20 @@ function PendingApprovalBanner({ c }: { c: Case }) {
 }
 
 function DeadlinesCard({ c }: { c: Case }) {
-  // Seleção: prazo vem do alerta de origem (occurredAt + 45 d); cumprida quando o case foi aberto (selectedAt)
-  const alert = useAlert(c.alertId)
-  const decided = !!c.decidedAt
+  const cur = currentDeadline(c)
   return (
-    <Card title="Prazos regulatórios (Circular BCB 3.978)">
+    <Card title="Prazos regulatórios (Circular BCB 3.978)" actions={<SlaBadge slaStatus={c.slaStatus} deadline={cur.deadline} phase={cur.phase} />}>
       <dl className="grid gap-4 sm:grid-cols-3">
         <KeyValue label="1. Seleção (até 45 dias da ocorrência)">
-          {alert.isLoading ? <Skeleton className="h-8 w-32" /> : <DeadlineBadge stage="selection" deadline={alert.data?.selectionDeadline} doneAt={c.selectedAt} />}
+          {formatDateTime(c.selectionDeadline)}
+          {c.selectedAt && <span className="block text-xs text-muted">Selecionado em {formatDateTime(c.selectedAt)}</span>}
         </KeyValue>
         <KeyValue label="2. Análise (até 45 dias da seleção)">
-          <DeadlineBadge stage="analysis" deadline={c.analysisDeadline} doneAt={decided ? c.decidedAt : null} />
+          {formatDateTime(c.analysisDeadline)}
+          {c.decidedAt && <span className="block text-xs text-muted">Decidido em {formatDateTime(c.decidedAt)}</span>}
         </KeyValue>
         <KeyValue label="3. Comunicação ao COAF (dia útil seguinte à decisão)">
-          {c.communicationDeadline ? (
-            <DeadlineBadge stage="communication" deadline={c.communicationDeadline} />
-          ) : (
-            <span className="text-xs text-muted">{c.decision === 'COMMUNICATE' ? 'Definido após a aprovação' : 'Não aplicável'}</span>
-          )}
+          {c.communicationDeadline ? formatDateTime(c.communicationDeadline) : <span className="text-xs text-muted">{c.decision === 'COMMUNICATE' ? 'Definido após a aprovação' : 'Não aplicável'}</span>}
         </KeyValue>
       </dl>
     </Card>
@@ -58,18 +53,20 @@ function DeadlinesCard({ c }: { c: Case }) {
 export function CaseDossierPage() {
   const { id } = useParams()
   const q = useCase(id)
+  const dossier = useCaseDossier(id)
 
   if (q.isLoading) return <Skeleton className="h-64 w-full" />
   if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />
   const c = q.data
   if (!c) return null
-  const locked = isFinalCase(c)
+  const locked = isClosedCase(c)
 
   return (
     <>
       <PageHeader title={`Dossiê ${c.caseNumber ?? `#${c.id.slice(0, 8)}`}`} subtitle={`Parte: ${c.partyName ?? '—'}`} />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <StatusBadge status={c.status} />
+        {c.partyRiskLevel && <Badge tone="neutral">Risco da parte: {severityLabel(c.partyRiskLevel)}</Badge>}
         <SeverityBadge severity={String(c.priority)} />
         {c.edd && <Badge tone="warning">EDD</Badge>}
         {c.escalationLevel > 0 && <Badge tone="orange">Nível de escalonamento {c.escalationLevel}</Badge>}
@@ -88,7 +85,9 @@ export function CaseDossierPage() {
           <BeneficialOwnersCard partyId={c.partyId} />
           <RiskHistoryCard partyId={c.partyId} />
           <ScreeningCard partyId={c.partyId} />
-          <TransactionsCard partyId={c.partyId} />
+          {dossier.data && <AlertEvidenceCard dossier={dossier.data} />}
+          {dossier.isLoading && <Skeleton className="h-24 w-full" />}
+          {dossier.data && <DossierTransactionsCard dossier={dossier.data} />}
         </div>
         <div className="space-y-4">
           <Card title="Decisão">
@@ -109,7 +108,8 @@ export function CaseDossierPage() {
           </Card>
           <EvidencesCard caseId={c.id} locked={locked} />
           <NotesCard caseId={c.id} locked={locked} />
-          <AuditTrailCard caseId={c.id} />
+          {dossier.data && <AuditTrailCard dossier={dossier.data} />}
+          {dossier.isError && <ErrorState error={dossier.error} compact />}
         </div>
       </div>
     </>

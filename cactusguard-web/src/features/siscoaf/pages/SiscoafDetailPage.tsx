@@ -113,6 +113,14 @@ export function SiscoafDetailPage() {
         }
       />
       <SecrecyNotice />
+      {c.fourEyesRequired && (
+        <div role="note" className="mb-4 flex items-start gap-3 rounded-xl border border-warning bg-warning-bg p-3 text-sm text-warning">
+          <p>
+            <strong>Quatro olhos exigido</strong> (PEP, risco alto/crítico ou EDD): o aprovador deve ser diferente de quem decidiu o case e de quem criou o rascunho, e o envio exige aprovação prévia.
+            {c.approvedById ? ` Aprovada em ${formatDateTime(c.approvedAt)}.` : ' Ainda não aprovada.'}
+          </p>
+        </div>
+      )}
       {isAutomaticCoe(c) && (
         <div role="note" className="mb-4 flex items-start gap-3 rounded-xl border border-info bg-info-bg p-3 text-sm text-info">
           <Zap size={18} className="mt-0.5 shrink-0" aria-hidden />
@@ -152,7 +160,7 @@ export function SiscoafDetailPage() {
             <KeyValue label="Case de origem">
               {c.caseId ? (
                 <Link className="text-brand underline" to={`/casos/${c.caseId}`}>
-                  #{c.caseId.slice(0, 8)}
+                  {c.caseNumber ?? `#${c.caseId.slice(0, 8)}`}
                 </Link>
               ) : (
                 '—'
@@ -184,6 +192,7 @@ export function SiscoafDetailPage() {
             {buildTimeline(c).map((h, i) => (
               <li key={`${h.status}-${i}`}>
                 <span className="font-medium">{siscoafStatusLabel(h.status)}</span>
+                {h.fromStatus && <span className="text-xs text-muted"> (de {siscoafStatusLabel(h.fromStatus)})</span>}
                 <span className="block text-xs text-muted">
                   {formatDateTime(h.at)}
                   {h.byName ? ` · ${h.byName}` : ''}

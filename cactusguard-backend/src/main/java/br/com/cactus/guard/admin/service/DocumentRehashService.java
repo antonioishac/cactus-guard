@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import br.com.cactus.guard.tenant.TenantContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -88,7 +89,8 @@ public class DocumentRehashService {
     /** Tabelas/colunas sao constantes internas (nunca entrada do usuario). */
     private long rehashColumn(String table, String docCol, String hashCol) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, " + docCol + " AS doc, " + hashCol + " AS h FROM " + table + " WHERE " + docCol + " IS NOT NULL");
+                "SELECT id, " + docCol + " AS doc, " + hashCol + " AS h FROM " + table + " WHERE " + docCol + " IS NOT NULL AND tenant_id = ?",
+                TenantContext.require());
         long updated = 0;
         for (Map<String, Object> row : rows) {
             String doc = String.valueOf(row.get("doc"));
@@ -98,11 +100,11 @@ public class DocumentRehashService {
             String clear = legacyPlain ? doc : converter.convertToEntityAttribute(doc);
             String h = DocumentHash.of(clear);
             if (legacyPlain) {
-                jdbc.update("UPDATE " + table + " SET " + docCol + " = ?, " + hashCol + " = ? WHERE id = ?",
-                        converter.convertToDatabaseColumn(clear), h, id);
+                jdbc.update("UPDATE " + table + " SET " + docCol + " = ?, " + hashCol + " = ? WHERE id = ? AND tenant_id = ?",
+                        converter.convertToDatabaseColumn(clear), h, id, TenantContext.require());
                 updated++;
             } else if (!h.equals(row.get("h"))) {
-                jdbc.update("UPDATE " + table + " SET " + hashCol + " = ? WHERE id = ?", h, id);
+                jdbc.update("UPDATE " + table + " SET " + hashCol + " = ? WHERE id = ? AND tenant_id = ?", h, id, TenantContext.require());
                 updated++;
             }
         }

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Pencil, Plus, UserCheck, UserX } from 'lucide-react'
+import { KeyRound, Pencil, Plus, UserCheck, UserX } from 'lucide-react'
 import type { Role, UserAccount } from '@/api/types'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
@@ -10,11 +10,12 @@ import { Card, PageHeader } from '@/components/ui/Layout'
 import { useAuth } from '@/features/auth/useAuth'
 import { useListState } from '@/hooks/useListState'
 import { formatDate } from '@/lib/format'
+import { ResetPasswordDialog } from '../components/ResetPasswordDialog'
 import { UserFormDialog } from '../components/UserFormDialog'
 import { ROLE_INFO, ROLE_ORDER } from '../roles'
 import { useActivateUser, useDeactivateUser, useUsers } from '../hooks'
 
-type Dialog = { kind: 'create' } | { kind: 'edit'; user: UserAccount } | { kind: 'deactivate'; user: UserAccount } | { kind: 'activate'; user: UserAccount } | null
+type Dialog = { kind: 'create' } | { kind: 'edit'; user: UserAccount } | { kind: 'deactivate'; user: UserAccount } | { kind: 'activate'; user: UserAccount } | { kind: 'reset'; user: UserAccount } | null
 
 const NO_KEYS = [] as const
 
@@ -41,6 +42,7 @@ export function UsersPage() {
         manage ? (
           <span className="flex gap-1">
             <Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => setDialog({ kind: 'edit', user: u })} aria-label={`Editar ${u.name}`}><Pencil size={14} aria-hidden /> Editar</Button>
+            <Button variant="ghost" className="!px-2 !py-1 text-xs" onClick={() => setDialog({ kind: 'reset', user: u })} aria-label={`Redefinir senha de ${u.name}`}><KeyRound size={14} aria-hidden /> Senha</Button>
             {u.active ? (
               <Button variant="ghost" className="!px-2 !py-1 text-xs" disabled={u.id === me?.id} title={u.id === me?.id ? 'Você não pode desativar a si mesmo' : undefined} onClick={() => setDialog({ kind: 'deactivate', user: u })} aria-label={`Desativar ${u.name}`}><UserX size={14} aria-hidden /> Desativar</Button>
             ) : (
@@ -82,6 +84,7 @@ export function UsersPage() {
         emptyTitle="Nenhum usuário encontrado"
       />
       {dialog?.kind === 'create' && <UserFormDialog onClose={() => setDialog(null)} />}
+      {dialog?.kind === 'reset' && <ResetPasswordDialog user={dialog.user} onClose={() => setDialog(null)} />}
       {dialog?.kind === 'edit' && <UserFormDialog user={dialog.user} onClose={() => setDialog(null)} />}
       <ConfirmDialog
         open={dialog?.kind === 'deactivate'}

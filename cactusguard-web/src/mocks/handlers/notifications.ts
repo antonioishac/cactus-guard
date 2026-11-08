@@ -1,8 +1,6 @@
 import { http, HttpResponse } from 'msw'
-import { API, err, guard, isResponse, paginate } from './helpers'
+import { API, READ, err, guard, isResponse, paginate } from './helpers'
 import { db2b } from './db2b'
-
-const READ = ['ANALYST', 'SUPERVISOR', 'ADMIN', 'AUDITOR']
 
 export const notificationsHandlers = [
   http.get(`${API}/notifications/unread-count`, ({ request }) => {
@@ -17,9 +15,18 @@ export const notificationsHandlers = [
     const unreadOnly = url.searchParams.get('unreadOnly') === 'true'
     return HttpResponse.json(paginate((db2b.notifications[u.id] ?? []).filter((n) => !unreadOnly || !n.read), url))
   }),
+  // rota estática antes de /:id/read
+  http.post(`${API}/notifications/read-all`, ({ request }) => {
+    const u = guard(request, READ)
+    if (isResponse(u)) return u
+    const mine = (db2b.notifications[u.id] ??= []).filter((n) => !n.read)
+    mine.forEach((n) => (n.read = true))
+    return HttpResponse.json({ updated: mine.length })
+  }),
   http.post(`${API}/notifications/:id/read`, ({ request, params }) => {
     const u = guard(request, READ)
     if (isResponse(u)) return u
+    // só notificação do próprio usuário
     const n = (db2b.notifications[u.id] ?? []).find((x) => x.id === params.id)
     if (!n) return err(404, 'Notificação não encontrada')
     n.read = true

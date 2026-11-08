@@ -1,8 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { db2b, resetDb2b } from '@/mocks/handlers/db2b'
-import { preload2B } from '@/test/preload2b'
+import { describe, expect, it } from 'vitest'
+import { db2b } from '@/mocks/handlers/db2b'
 import { loginAs, renderApp } from '@/test/utils'
 import { siscoafDeadline } from './deadline'
 
@@ -10,8 +9,6 @@ const H = 3_600_000
 const NOW = Date.parse('2026-11-08T12:00:00Z')
 const at = (offsetMs: number) => new Date(NOW + offsetMs).toISOString()
 
-beforeAll(() => preload2B(), 30_000)
-beforeEach(() => resetDb2b())
 
 describe('semáforo do prazo SISCOAF', () => {
   it('classifica no prazo, vencendo e vencido', () => {

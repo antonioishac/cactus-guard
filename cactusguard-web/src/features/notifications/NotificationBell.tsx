@@ -4,7 +4,7 @@ import { Bell } from 'lucide-react'
 import type { AppNotification } from '@/api/types'
 import { formatDateTime } from '@/lib/format'
 import { notificationLink } from './links'
-import { useMarkRead, useNotifications, useUnreadCount } from './hooks'
+import { useMarkAllRead, useMarkRead, useNotifications, useUnreadCount } from './hooks'
 
 export function NotificationBell() {
   const [open, setOpen] = useState(false)
@@ -13,6 +13,7 @@ export function NotificationBell() {
   const count = useUnreadCount()
   const list = useNotifications(open)
   const markRead = useMarkRead()
+  const markAll = useMarkAllRead()
   const unread = count.data ?? 0
 
   useEffect(() => {
@@ -56,7 +57,16 @@ export function NotificationBell() {
       </button>
       {open && (
         <div role="region" aria-label="Notificações" className="absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] rounded-xl border border-line bg-surface shadow-xl">
-          <p className="border-b border-line px-3 py-2 text-sm font-semibold">Notificações</p>
+          <div className="flex items-center justify-between border-b border-line px-3 py-2">
+            <p className="text-sm font-semibold">Notificações</p>
+            <button
+              onClick={() => markAll.mutate()}
+              disabled={unread === 0 || markAll.isPending}
+              className="text-xs text-brand underline-offset-2 hover:underline disabled:text-muted disabled:no-underline"
+            >
+              Marcar todas como lidas
+            </button>
+          </div>
           <div className="max-h-96 overflow-y-auto">
             {list.isLoading && <p className="px-3 py-4 text-sm text-muted">Carregando…</p>}
             {list.error && <p className="px-3 py-4 text-sm text-muted">Não foi possível carregar as notificações.</p>}

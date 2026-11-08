@@ -1,0 +1,58 @@
+# Workflow reutilizável: diz se o PR alterou arquivos que casam com um regex (ERE).
+#
+# Por que não usar `on.pull_request.paths`? Workflow pulado por filtro de caminho deixa o check
+# obrigatório "pendente" para sempre e trava o merge. Com este job, o workflow sempre roda em PR e
+# os jobs pesados ficam "skipped" (que conta como sucesso na proteção de branch) quando nada mudou.
+# Em push/workflow_dispatch/schedule devolve sempre "true" (o push já é filtrado por `paths`).
+name: _changes
+
+on:
+  workflow_call:
+    inputs:
+      pattern:
+        description: Regex estendido (grep -E) aplicado a cada caminho alterado
+        required: true
+        type: string
+    outputs:
+      changed:
+        description: '"true" se algum arquivo alterado casa com o regex'
+        value: ${{ jobs.detect.outputs.changed }}
+
+permissions: {}
+
+jobs:
+  detect:
+    name: detect
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: ${{ github.event_name == 'pull_request' }}
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          filter: blob:none
+
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PATTERN: ${{ inputs.pattern }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          files=$(git diff --name-only "$BASE_SHA...$HEAD_SHA")
+          if printf '%s\n' "$files" | grep -Eq -- "$PATTERN"; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Arquivos alterados que casam com '$PATTERN':"
+          printf '%s\n' "$files" | grep -E -- "$PATTERN" || echo "(nenhum)"

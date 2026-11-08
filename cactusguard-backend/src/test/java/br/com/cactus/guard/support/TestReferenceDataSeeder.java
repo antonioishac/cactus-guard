@@ -40,10 +40,14 @@ public class TestReferenceDataSeeder implements ApplicationRunner {
     private final ReportDefinitionRepository reportDefinitionRepository;
     private final MonitoringRuleRepository ruleRepository;
     private final ScreeningListRepository listRepository;
+    private final br.com.cactus.guard.tenant.repository.TenantRepository tenantRepository;
 
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
+        tenant(br.com.cactus.guard.tenant.TenantContext.DEFAULT_TENANT_ID, "default", "Tenant padrao");
+        tenant(br.com.cactus.guard.tenant.TenantContext.PLATFORM_TENANT_ID, "platform", "Plataforma");
+        role("PLATFORM_ADMIN", "Administrador da plataforma");
         role("ADMIN", "Administrador do sistema");
         role("ANALYST", "Analista de PLD");
         role("SUPERVISOR", "Supervisor de compliance");
@@ -80,6 +84,14 @@ public class TestReferenceDataSeeder implements ApplicationRunner {
         list("UN_SANCTIONS", "Sanções ONU", "SANCTION", "UN Security Council");
         freezeList("CSNU", "Sanções CSNU (Lei 13.810/2019)", "CSNU", "UN Security Council");
         list("OFAC", "OFAC SDN", "SANCTION", "US Treasury");
+    }
+
+    private void tenant(java.util.UUID id, String code, String name) {
+        if (tenantRepository.existsById(id)) {
+            return;
+        }
+        tenantRepository.save(br.com.cactus.guard.tenant.entity.Tenant.builder()
+                .id(id).code(code).name(name).regulatorySegment("OTHER").build());
     }
 
     private void adminUser() {

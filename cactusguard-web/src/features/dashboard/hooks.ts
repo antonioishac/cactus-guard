@@ -6,9 +6,9 @@ const REFRESH_MS = 60_000
 const base = { refetchInterval: REFRESH_MS, retry: false } as const
 
 export const useOperational = () => useQuery({ queryKey: ['dashboard', 'operational'], queryFn: getOperational, ...base, retry: 1 })
-// Endpoints abaixo ainda não existem no backend real: sem retry, cada seção degrada sozinha.
+// Cada seção do dashboard degrada sozinha (sem retry) se o endpoint falhar.
 export const useMetrics = () => useQuery({ queryKey: ['dashboard', 'metrics'], queryFn: getMetrics, ...base })
-export const useAlertsChart = () => useQuery({ queryKey: ['dashboard', 'alerts-chart'], queryFn: getAlertsChart, ...base })
+export const useAlertsChart = () => useQuery({ queryKey: ['dashboard', 'alerts-chart'], queryFn: () => getAlertsChart(7), ...base })
 export const useSeverityDistribution = () => useQuery({ queryKey: ['dashboard', 'severity'], queryFn: getSeverityDistribution, ...base })
 export const useCaseSla = () => useQuery({ queryKey: ['dashboard', 'case-sla'], queryFn: getCaseSla, ...base })
 

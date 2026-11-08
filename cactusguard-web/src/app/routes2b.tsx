@@ -1,15 +1,12 @@
-import type { ComponentType } from 'react'
 import type { RouteObject } from 'react-router'
 import { RequireRole } from '@/features/auth/guards'
+import { lazyPage } from './lazyPage'
 import { AUDIT_ROLES, SISCOAF_ROLES, APPROVER_ROLES } from './nav'
 
 /**
- * Rotas da etapa 2B (SISCOAF, Regras, Relatórios, Auditoria, Aprovações) com carregamento sob demanda
- * (code-splitting): cada página vira um chunk próprio.
+ * Rotas de SISCOAF, Regras, Relatórios, Auditoria e Aprovações com carregamento sob demanda.
  */
-const page = <T extends Record<string, unknown>>(load: () => Promise<T>, name: keyof T): Pick<RouteObject, 'lazy'> => ({
-  lazy: async () => ({ Component: (await load())[name] as ComponentType }),
-})
+const page = lazyPage
 
 export const routes2B: RouteObject[] = [
   {

@@ -1,9 +1,8 @@
 import type { ISODate, ISODateTime, UUID } from './common'
 
 /**
- * PartyResponse do backend expõe apenas o bloco "core". Os campos do catálogo spec 046 que a entity
- * já possui mas o DTO não expõe estão como opcionais (nomes iguais aos da entity `Party`).
- * PII (document, email, phone, motherName) chega mascarada.
+ * PartyResponse (spec 046). PII (document, email, phone, motherName) chega SEMPRE mascarada.
+ * Campos do bloco 046 são opcionais só por conveniência dos mocks/formulários; o backend os devolve.
  */
 export interface Party {
   id: UUID
@@ -20,7 +19,7 @@ export interface Party {
   status: string
   createdAt: ISODateTime
 
-  /* --- spec 046 (opcionais: ainda não no DTO; nomes da entity Party) --- */
+  /* --- spec 046 --- */
   motherName?: string | null
   sourceType?: string | null
   partyRole?: string | null
@@ -46,8 +45,6 @@ export interface Party {
   riskScore?: number | null
   riskCalculatedAt?: ISODateTime | null
   nextReviewDate?: ISODate | null
-  /** Fatores do score — PROPOSTO (backend ainda não devolve). */
-  riskFactors?: RiskFactor[] | null
   eddRequired?: boolean
   uboIdentified?: boolean | null
   uboNotIdentifiedReason?: string | null
@@ -59,38 +56,37 @@ export interface Party {
   pepEndDate?: ISODate | null
   pepExpiryDate?: ISODate | null
   pepApprovalAt?: ISODateTime | null
-  /** Nome de quem aprovou (a entity tem o User; o DTO deve achatar). */
+  /** Nome de quem aprovou a alta administração. */
   pepApprovalByName?: string | null
   assetFreezeActive?: boolean
   assetFreezeAt?: ISODateTime | null
   assetFreezeReference?: string | null
 }
 
-export interface RiskFactor {
-  code: string
-  label: string
-  weight?: number | null
-}
-
 export type PiiField = 'document' | 'motherName' | 'email' | 'phone'
 
-/** Contrato PROPOSTO (não existe no backend): revela um campo de PII e registra DataAccessLog. */
+/** POST /parties/{id}/reveal (ANALYST/SUPERVISOR/AUDITOR). `reason` 10–500 caracteres; registra data_access_log. */
 export interface RevealRequest {
-  field: PiiField
+  field?: PiiField
+  fields?: PiiField[]
   reason: string
 }
 export interface RevealResponse {
-  field: PiiField
-  value: string
+  field: PiiField | null
+  value: string | null
+  values: Partial<Record<PiiField, string>>
 }
+
+export const REVEAL_REASON_MIN = 10
+export const REVEAL_REASON_MAX = 500
 
 export const PARTY_TYPES = ['PF', 'PJ'] as const
 export const SOURCE_TYPES = ['ONBOARDED', 'MIGRATED'] as const
 export const RISK_LEVELS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const
 
 /**
- * Filtros da listagem. Backend: `GET /parties` (só paginação) e `GET /parties/search?q=`.
- * DIVERGÊNCIA: os demais filtros (spec 033/026) são PROPOSTOS; `document`/`q` nunca vão para a URL do navegador.
+ * Filtros de `GET /parties` (todos combináveis). `q` e `document` são PII em potencial: vão só na
+ * requisição, nunca na URL do navegador. `riskLevel` (não `riskCategory`).
  */
 export interface PartyFilters {
   q?: string
@@ -101,10 +97,13 @@ export interface PartyFilters {
   sourceType?: string
 }
 
-/** PartyRequest do backend (campos extras da spec 046 são enviados, mas o backend atual os ignora). */
+/**
+ * PartyRequest. `document` é obrigatório só na criação e IMUTÁVEL: no PUT omita-o (ou envie o mascarado, que é ignorado).
+ * Em PUT, email/phone/motherName com `*` ou null mantêm o valor atual; "" limpa.
+ */
 export interface PartyRequest {
   type: 'PF' | 'PJ'
-  document: string
+  document?: string
   name: string
   tradeName?: string | null
   email?: string | null
@@ -112,8 +111,14 @@ export interface PartyRequest {
   birthDate?: ISODate | null
   nationality?: string | null
   occupation?: string | null
-  /* --- spec 046 (ignorados pelo backend atual) --- */
+  /* --- spec 046 --- */
   motherName?: string | null
+  partyRole?: string | null
+  relationshipStartDate?: ISODate | null
+  cnaesSecondary?: string[] | null
+  legalNatureCode?: string | null
+  nonprofit?: boolean
+  publiclyTraded?: boolean
   cboCode?: string | null
   countryOfResidence?: string | null
   declaredMonthlyIncome?: number | null
@@ -128,7 +133,7 @@ export interface PartyRequest {
   companySize?: string | null
 }
 
-/** Entity PartyAddress serializada direto pelo controller. */
+/** PartyAddress (o backend ainda serializa a entity; usar só estes campos). */
 export interface PartyAddress {
   id: UUID
   type: string | null
@@ -143,25 +148,34 @@ export interface PartyAddress {
   primary: boolean
 }
 
-/** Entity PartyRelationship serializada direto pelo controller (relatedParty é a entity Party). */
+/** Resumo mascarado da parte relacionada (nunca a entity). */
+export interface RelatedPartySummary {
+  id: UUID
+  name: string
+  type: string | null
+  document: string | null
+  pep: boolean
+  pepStatus: string | null
+  riskLevel: string | null
+}
+
 export interface PartyRelationship {
   id: UUID
-  relatedParty: { id: UUID; name: string; type?: string; pep?: boolean; pepStatus?: string | null } | null
+  relatedParty: RelatedPartySummary | null
   relationshipType: string
   description: string | null
   active: boolean
   validFrom: ISODate | null
   validTo: ISODate | null
-  details?: Record<string, unknown> | null
+  details: Record<string, unknown> | null
 }
 
 export interface OwnershipLink {
   name: string
   pct: number | null
-  document_hash?: string
 }
 
-/** Entity BeneficialOwner serializada direto pelo controller. */
+/** BeneficialOwnerResponse (documento do sócio mascarado). */
 export interface BeneficialOwner {
   id: UUID
   ownerDocument: string
@@ -207,9 +221,11 @@ export interface PepResponse {
   approved: boolean
   eddRequired: boolean
   riskLevel: string | null
+  approvedAt: ISODateTime | null
+  approvedByName: string | null
 }
 
-/** Entity RiskHistory serializada direto pelo controller (sem DTO). */
+/** RiskHistory (o backend ainda serializa a entity; usar só estes campos). */
 export interface RiskHistoryEntry {
   id: UUID
   previousScore: number | null

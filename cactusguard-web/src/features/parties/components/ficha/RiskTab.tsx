@@ -58,13 +58,7 @@ export function RiskTab({ party }: { party: Party }) {
         </dl>
         <div className="mt-3">
           <h3 className="mb-1 text-sm font-semibold">Fatores</h3>
-          {party.riskFactors?.length ? (
-            <ul className="flex flex-wrap gap-2 text-sm">
-              {party.riskFactors.map((f) => <li key={f.code}><Badge tone="neutral">{f.label}{f.weight != null ? ` (+${f.weight})` : ''}</Badge></li>)}
-            </ul>
-          ) : (
-            <p className="text-sm text-muted">A API ainda não detalha os fatores; veja os motivos de cada alteração no histórico abaixo.</p>
-          )}
+          <p className="text-sm text-muted">Os fatores do score ficam no motivo de cada alteração, no histórico abaixo.</p>
         </div>
       </Card>
 

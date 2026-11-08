@@ -12,19 +12,20 @@ import java.util.Map;
 import java.util.UUID;
 
 @Entity
-@Table(name = "monitoring_rules")
+@Table(name = "monitoring_rules",
+       uniqueConstraints = @UniqueConstraint(name = "uq_monitoring_rules_tenant_code", columnNames = {"tenant_id", "code"}))
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MonitoringRule {
+public class MonitoringRule extends br.com.cactus.guard.tenant.TenantScoped {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, unique = true, length = 50)
+    @Column(nullable = false, length = 50)
     private String code;
 
     @Column(nullable = false)

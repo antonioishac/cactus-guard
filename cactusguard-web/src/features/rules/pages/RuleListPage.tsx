@@ -8,7 +8,7 @@ import { FilterBar, SelectFilter, TextFilter } from '@/components/ui/Filters'
 import { PageHeader } from '@/components/ui/Layout'
 import { useAuth } from '@/features/auth/useAuth'
 import { useListState } from '@/hooks/useListState'
-import { formatDate, severityLabel } from '@/lib/format'
+import { formatDate, formatPercent, severityLabel } from '@/lib/format'
 import { RunEngineButton } from '../components/RuleActions'
 import { RuleStatusBadge } from '../components/Shared'
 import { useRules } from '../hooks'
@@ -33,6 +33,8 @@ const columns: Column<MonitoringRule>[] = [
   { key: 'severity', header: 'Severidade', sortField: 'severity', render: (r) => <SeverityBadge severity={r.severity} /> },
   { key: 'status', header: 'Status', sortField: 'status', render: (r) => <RuleStatusBadge status={r.status} /> },
   { key: 'version', header: 'Versão', sortField: 'version', render: (r) => `v${r.version}` },
+  { key: 'alerts', header: 'Alertas (30 d)', className: 'text-right tabular-nums', render: (r) => (r.alertsGenerated != null ? r.alertsGenerated : '—') },
+  { key: 'fp', header: 'Falso positivo (30 d)', className: 'text-right tabular-nums', render: (r) => (r.falsePositiveRate != null ? formatPercent(r.falsePositiveRate * 100) : '—') },
   { key: 'from', header: 'Vigência desde', render: (r) => formatDate(r.effectiveFrom) },
 ]
 
@@ -40,8 +42,7 @@ export function RuleListPage() {
   const { can } = useAuth()
   const list = useListState(KEYS, 'code,asc')
   const f = list.filters
-  const q = useRules({ status: f.status, category: f.category, severity: f.severity, q: f.q }, { page: list.page, size: list.size, sort: list.sort })
-  const onlyActive = !!q.data && q.data.content.length > 0 && q.data.content.every((r) => r.status === 'ACTIVE') && !f.status
+  const q = useRules({ status: f.status, category: f.category, severity: f.severity, q: f.q, includeInactive: true }, { page: list.page, size: list.size, sort: list.sort })
 
   return (
     <>
@@ -65,11 +66,6 @@ export function RuleListPage() {
         <SelectFilter label="Categoria" value={f.category} onChange={(v) => list.setFilter('category', v)} options={Object.entries(CATEGORY_LABEL).map(([value, label]) => ({ value, label }))} />
         <SelectFilter label="Severidade" value={f.severity} onChange={(v) => list.setFilter('severity', v)} options={['CRITICAL', 'HIGH', 'MEDIUM', 'LOW'].map((s) => ({ value: s, label: severityLabel(s) }))} />
       </FilterBar>
-      {onlyActive && (
-        <p role="note" className="mb-3 text-xs text-muted">
-          A API atual lista apenas regras ativas; regras pendentes, inativas e em rascunho aparecem quando o backend expuser todas.
-        </p>
-      )}
       <DataTable
         caption="Regras de monitoramento"
         columns={columns}

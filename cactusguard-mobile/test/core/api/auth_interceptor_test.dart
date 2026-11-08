@@ -15,7 +15,7 @@ void main() {
   setUp(() async {
     env = TestEnv();
     c = env.container();
-    await c.read(authControllerProvider).login('analista', 'cactus123');
+    await c.read(authControllerProvider).login('analista', 'dev12345');
   });
 
   tearDown(() => c.dispose());

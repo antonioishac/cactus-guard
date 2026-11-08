@@ -4,7 +4,7 @@ import type { SiscoafCommunication } from '@/api/types'
 import { Badge } from '@/components/ui/Badge'
 import { DataTable } from '@/components/ui/DataTable'
 import type { Column } from '@/components/ui/DataTable'
-import { FilterBar, SelectFilter } from '@/components/ui/Filters'
+import { FilterBar, SelectFilter, TextFilter } from '@/components/ui/Filters'
 import { PageHeader } from '@/components/ui/Layout'
 import { Button } from '@/components/ui/Button'
 import { useAuth } from '@/features/auth/useAuth'
@@ -14,7 +14,7 @@ import { STATUS_LABEL, TYPE_LABEL } from '../deadline'
 import { SecrecyNotice, SiscoafDeadlineBadge, SiscoafStatusBadge, SiscoafTypeBadge } from '../components/Shared'
 import { useSiscoafList } from '../hooks'
 
-const KEYS = ['status', 'type'] as const
+const KEYS = ['status', 'type', 'from', 'to', 'caseId'] as const
 const TAB_STATUSES = ['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'SUBMITTED', 'ACKNOWLEDGED', 'REJECTED', 'CANCELLED', 'RECTIFIED']
 const TYPES = ['COS', 'COE', 'NEGATIVE_DECLARATION', 'COAF_COMMUNICATION']
 
@@ -25,9 +25,11 @@ const columns: Column<SiscoafCommunication>[] = [
     render: (c) => (
       <Link to={`/siscoaf/${c.id}`} className="font-medium text-brand underline-offset-2 hover:underline">
         #{c.id.slice(0, 8)}
+        {c.caseNumber && <span className="block text-xs font-normal text-muted">{c.caseNumber}</span>}
       </Link>
     ),
   },
+  { key: 'party', header: 'Parte', render: (c) => c.partyName ?? '—' },
   {
     key: 'type',
     header: 'Tipo',
@@ -50,12 +52,13 @@ const columns: Column<SiscoafCommunication>[] = [
 export function SiscoafListPage() {
   const { can } = useAuth()
   const state = useListState(KEYS, 'deadlineAt,asc')
-  // DIVERGÊNCIA: o backend lista um status por vez (default DRAFT); sem status na URL usamos DRAFT.
-  const status = state.filters.status || 'DRAFT'
-  const type = state.filters.type
-  const q = useSiscoafList({ status, type: type || undefined }, { page: state.page, size: state.size, sort: state.sort })
-  // o backend ainda ignora `type`: filtra também a página recebida
-  const page = q.data && type ? { ...q.data, content: q.data.content.filter((c) => c.type === type) } : q.data
+  // sem `status` o backend lista todos
+  const { status, type, from, to, caseId } = state.filters
+  const q = useSiscoafList(
+    { status: status || undefined, type: type || undefined, from: from || undefined, to: to || undefined, caseId: caseId || undefined },
+    { page: state.page, size: state.size, sort: state.sort },
+  )
+  const page = q.data
 
   return (
     <>
@@ -77,12 +80,20 @@ export function SiscoafListPage() {
       </div>
 
       <div role="tablist" aria-label="Status das comunicações" className="mb-3 flex flex-wrap gap-1">
+        <button
+          role="tab"
+          aria-selected={!status}
+          onClick={() => state.setFilter('status', '')}
+          className={`rounded-lg px-3 py-1.5 text-sm ${!status ? 'bg-brand text-white' : 'border border-line bg-surface hover:bg-neutral-bg'}`}
+        >
+          Todas
+        </button>
         {TAB_STATUSES.map((s) => (
           <button
             key={s}
             role="tab"
             aria-selected={status === s}
-            onClick={() => state.setFilter('status', s === 'DRAFT' ? '' : s)}
+            onClick={() => state.setFilter('status', s)}
             className={`rounded-lg px-3 py-1.5 text-sm ${status === s ? 'bg-brand text-white' : 'border border-line bg-surface hover:bg-neutral-bg'}`}
           >
             {STATUS_LABEL[s]}
@@ -91,6 +102,9 @@ export function SiscoafListPage() {
       </div>
       <FilterBar onClear={state.clear} hasActive={state.hasActive}>
         <SelectFilter label="Tipo" value={type} onChange={(v) => state.setFilter('type', v)} options={TYPES.map((t) => ({ value: t, label: TYPE_LABEL[t] ?? t }))} />
+        <TextFilter label="Criada de" type="date" value={from} onChange={(v) => state.setFilter('from', v)} />
+        <TextFilter label="Criada até" type="date" value={to} onChange={(v) => state.setFilter('to', v)} />
+        <TextFilter label="ID do case" value={caseId} onChange={(v) => state.setFilter('caseId', v.trim())} placeholder="UUID" />
       </FilterBar>
       <DataTable
         caption="Comunicações SISCOAF"
@@ -104,7 +118,7 @@ export function SiscoafListPage() {
         sort={state.sort}
         onSort={state.setSort}
         onPage={state.setPage}
-        emptyTitle="Nenhuma comunicação neste status"
+        emptyTitle="Nenhuma comunicação encontrada"
         emptyHint={can('siscoaf:act') ? 'Rascunhos nascem de cases com decisão COMUNICAR aprovada.' : undefined}
       />
     </>

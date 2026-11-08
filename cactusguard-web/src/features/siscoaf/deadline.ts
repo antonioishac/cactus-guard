@@ -29,17 +29,14 @@ export const isAutomaticCoe = (c: Pick<SiscoafCommunication, 'type'>) => c.type 
 
 export const isCancellable = (c: Pick<SiscoafCommunication, 'status'>) => ['DRAFT', 'PENDING_REVIEW', 'APPROVED'].includes(c.status)
 export const isApprovable = (c: Pick<SiscoafCommunication, 'status'>) => ['DRAFT', 'PENDING_REVIEW'].includes(c.status)
-export const isSendable = (c: Pick<SiscoafCommunication, 'status'>) => ['DRAFT', 'APPROVED'].includes(c.status)
+/** Com quatro olhos exigidos (PEP, risco alto/crítico ou EDD) o rascunho só pode ser enviado após a aprovação. */
+export const isSendable = (c: Pick<SiscoafCommunication, 'status' | 'fourEyesRequired'>) =>
+  c.status === 'APPROVED' || (c.status === 'DRAFT' && !c.fourEyesRequired)
 export const isRectifiable = (c: Pick<SiscoafCommunication, 'status'>) => SENT_STATUSES.includes(c.status)
 
-/** Histórico de status: usa o do backend se vier; senão reconstrói pelos carimbos de data do DTO. */
+/** Histórico de status do backend (`siscoaf_history`), do mais antigo para o mais recente. */
 export function buildTimeline(c: SiscoafCommunication): SiscoafHistoryEntry[] {
-  if (c.statusHistory && c.statusHistory.length > 0) return [...c.statusHistory].sort((a, b) => a.at.localeCompare(b.at))
-  const out: SiscoafHistoryEntry[] = [{ status: 'DRAFT', at: c.createdAt }]
-  if (c.decidedAt) out.push({ status: 'DECIDED', at: c.decidedAt })
-  if (c.submittedAt) out.push({ status: c.status === 'ACKNOWLEDGED' ? 'SUBMITTED' : c.status === 'RECTIFIED' ? 'SUBMITTED' : c.status, at: c.submittedAt })
-  if (c.cancelledAt) out.push({ status: 'CANCELLED', at: c.cancelledAt, reason: c.cancelReason })
-  return out.sort((a, b) => a.at.localeCompare(b.at))
+  return [...(c.statusHistory ?? [])].sort((a, b) => a.at.localeCompare(b.at))
 }
 
 export const TYPE_LABEL: Record<string, string> = {

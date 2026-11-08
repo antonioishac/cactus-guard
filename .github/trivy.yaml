@@ -1,0 +1,15 @@
+# Configuração comum do Trivy (security.yml / docker.yml e execução local).
+# Severidade, formato e exit code ficam na linha de comando de cada etapa (relatório x gate).
+scan:
+  skip-dirs:
+    - "**/node_modules"
+    - "**/target"
+    - "**/dist"
+    - "**/.dart_tool"
+    - "cactusguard-mobile/build"
+    - ".idea"
+db:
+  # Espelho padrão do banco de vulnerabilidades (evita limite de requisições do ghcr.io)
+  repository:
+    - mirror.gcr.io/aquasec/trivy-db
+    - ghcr.io/aquasecurity/trivy-db

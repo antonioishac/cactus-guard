@@ -42,6 +42,8 @@ Respostas de erro seguem o padrão global do backend.
 **Request**: header Authorization  
 **Response 204**
 
+**Multi-tenancy**: o `accessToken` (JWT) carrega o claim `tenant_id` (UUID do tenant do usuário, definido no login a partir do cadastro; o cliente **não** informa tenant). `username` é único globalmente. Token válido com tenant ausente/inexistente/`SUSPENDED` → **403** `TENANT_INACTIVE`; login com senha correta em tenant suspenso → **403**. O refresh herda o tenant do refresh token.
+
 ---
 
 ## Alertas
@@ -145,7 +147,7 @@ fourEyesRequired, payload, createdAt`. `GET /siscoaf/{id}` acrescenta `statusHis
 
 ### POST /api/v1/siscoaf/{id}/approve  (SUPERVISOR)
 `{ "comment": "justificativa ≥ 20 não brancos" }` (ou `justification`). `DRAFT|PENDING_REVIEW` → `APPROVED`; **não envia**. Se a parte é PEP, risco
-alto/crítico ou o case é EDD (`fourEyesRequired`): aprovador ≠ criador do rascunho e ≠ decisor do case (422), e o `submit` de `DRAFT` é bloqueado
+alto/crítico ou o case é EDD (`fourEyesRequired`): aprovador ≠ decisor do case e ≠ criador do rascunho (422) — exceto quando o rascunho foi gerado automaticamente na aprovação do case (criador = aprovador do case; a independência já foi garantida), em que basta ≠ decisor —, e o `submit` de `DRAFT` é bloqueado
 (exige aprovação prévia). COS exige case com `COMMUNICATE` aprovado.
 ### POST /api/v1/siscoaf/{id}/submit  (SUPERVISOR)
 Corpo opcional `{ "reason": "≥ 20 caracteres, se informado" }` — gravado em `siscoaf_history` e no `audit_log`. O aprovador original é preservado.
@@ -357,3 +359,21 @@ senão gerado) e MDC `traceId` nos logs. Nunca há stack trace nem valor rejeita
 - Busca textual (`q`) usa full-text search no backend.
 - O frontend não deve assumir campos que não estejam documentados aqui.
 - Novos endpoints devem seguir o mesmo padrão de resposta e erro.
+
+---
+
+## Plataforma — tenants (somente `PLATFORM_ADMIN`; sem acesso a dados de negócio)
+
+Role `PLATFORM_ADMIN` vive no tenant `platform` e **não** possui ADMIN/SUPERVISOR/ANALYST/AUDITOR (403 em todos os endpoints de dados de cliente). Tudo auditado.
+
+### POST /api/v1/platform/tenants → 201
+Provisiona tenant + copia o catálogo de regras-modelo (com versão 1) + cria o primeiro `ADMIN` do tenant.
+**Request**: `{ "code": "slug", "name": "...", "cnpj": "...", "regulatorySegment": "BANK|PAYMENT_INSTITUTION|SCD|SEP|BROKER_CVM|INSURER_SUSEP|VASP|OTHER", "adminUsername": "...", "adminEmail": "...", "adminName": "..." }`
+**Response 201**: `{ "tenant": { "id", "code", "name", "cnpjMasked", "regulatorySegment", "status", "createdAt" }, "adminUsername": "...", "temporaryPassword": "...", "rulesCopied": 14 }` — `temporaryPassword` (16 caracteres) é devolvida **uma única vez**.
+Erros 422: `TENANT_CODE_IN_USE`, `TENANT_CNPJ_IN_USE`, `USERNAME_IN_USE`.
+
+### GET /api/v1/platform/tenants (paginado) | GET /api/v1/platform/tenants/{id}
+CNPJ sempre mascarado.
+
+### POST /api/v1/platform/tenants/{id}/suspend | /reactivate
+**Request**: `{ "reason": "justificativa (mín. 20 caracteres)" }`. Suspender → logins e tokens vigentes do tenant passam a 403 (efeito imediato nesta instância; até 30 s nas demais). O tenant `platform` não pode ser suspenso.

@@ -6,7 +6,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import br.com.cactus.guard.tenant.service.TenantRunner;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -43,9 +45,20 @@ public class DataRetentionJob {
         return retentionDays;
     }
 
+    @Autowired
+    private TenantRunner tenantRunner;
+
+    @Autowired
+    private TransactionTemplate tx;
+
+    /** Expurgo por tenant: audit_log e data_access_log sao do tenant (e protegidos por RLS). */
     @Scheduled(cron = "0 0 3 * * SUN")
-    @Transactional
     public void purgeOldLogs() {
+        tenantRunner.forEachActiveTenant("DataRetentionJob", tenantId -> tx.executeWithoutResult(s -> purgeCurrentTenant()));
+    }
+
+    /** Roda dentro de transacao e do tenant corrente. */
+    void purgeCurrentTenant() {
         Instant cutoff = Instant.now().minus(retentionDays, ChronoUnit.DAYS);
 
         long auditDeleted = auditLogRepository.deleteByCreatedAtBefore(cutoff);

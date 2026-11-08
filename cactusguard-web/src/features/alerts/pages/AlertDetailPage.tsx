@@ -1,21 +1,18 @@
 import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { useQueries } from '@tanstack/react-query'
-import { ArrowUpRight, FolderPlus, Hand, ShieldOff } from 'lucide-react'
-import { getTransaction } from '@/api/parties'
+import { ArrowUpRight, FolderPlus, Hand, Send, ShieldOff } from 'lucide-react'
 import type { AlertDetail } from '@/api/types'
 import { Badge, SeverityBadge, StatusBadge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { DeadlineBadge } from '@/components/ui/DeadlineBadge'
 import { EmptyState, ErrorState, Skeleton } from '@/components/ui/Feedback'
 import { JustificationDialog } from '@/components/ui/JustificationDialog'
 import { Card, KeyValue, PageHeader } from '@/components/ui/Layout'
 import { useAuth } from '@/features/auth/useAuth'
 import { PartySummaryCard } from '@/features/parties/components/PartySummaryCard'
-import { TransactionsCard } from '@/features/parties/components/PartySections'
-import { formatBRL, formatDateTime, maskDocument } from '@/lib/format'
-import { useAlert, useAssumeAlert, useEscalateAlert, useFalsePositive, useOpenCase } from '../hooks'
+import { directionLabel } from '@/features/parties/rules'
+import { formatBRL, formatDateTime } from '@/lib/format'
+import { useAddAlertComment, useAlert, useAlertComments, useAssumeAlert, useEscalateAlert, useFalsePositive, useOpenCase } from '../hooks'
 
 type Dialog = 'escalate' | 'falsePositive' | 'openCase' | null
 
@@ -25,7 +22,7 @@ function EvidenceCard({ a }: { a: AlertDetail }) {
   return (
     <Card title="Evidências: parâmetros e valores observados">
       {!a.evidence || a.evidence.length === 0 ? (
-        <EmptyState title="Evidências não disponíveis" hint="O backend ainda não expõe o snapshot de evidências deste alerta." />
+        <EmptyState title="Sem evidências registradas" hint="O alerta não guardou snapshot de evidências do disparo." />
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -53,26 +50,64 @@ function EvidenceCard({ a }: { a: AlertDetail }) {
 }
 
 function LinkedTransactions({ a }: { a: AlertDetail }) {
-  const ids = a.triggeringTransactionIds ?? []
-  const results = useQueries({ queries: ids.map((id) => ({ queryKey: ['transaction', id], queryFn: () => getTransaction(id) })) })
-  if (ids.length === 0) return <TransactionsCard partyId={a.partyId} title="Transações da parte (vínculo direto não disponível)" />
+  const txs = a.transactions ?? []
   return (
     <Card title="Transações que dispararam o alerta">
-      <ul className="divide-y divide-line text-sm">
-        {results.map((r, i) => (
-          <li key={ids[i]} className="flex flex-wrap justify-between gap-2 py-2">
-            {r.isLoading && <Skeleton className="h-4 w-full" />}
-            {r.data && (
-              <>
-                <span>{formatDateTime(r.data.transactionDate)} · {r.data.type}{r.data.cash && ' (espécie)'}</span>
-                <span className="tabular-nums">{formatBRL(r.data.amountBrl ?? r.data.amount)}</span>
-                <span className="text-muted">{r.data.counterpartyName ?? '—'} {maskDocument(r.data.counterpartyDocument)}</span>
-              </>
-            )}
-            {r.isError && <ErrorState error={r.error} compact />}
-          </li>
-        ))}
-      </ul>
+      {txs.length === 0 ? (
+        <EmptyState title="Nenhuma transação vinculada" />
+      ) : (
+        <ul className="divide-y divide-line text-sm">
+          {txs.map((t) => (
+            <li key={t.id} className="flex flex-wrap justify-between gap-2 py-2">
+              <span>
+                {formatDateTime(t.transactionDate)} · {t.paymentMethod ?? t.type}
+                {t.cash && ' (espécie)'} · {directionLabel(t.direction)}
+              </span>
+              <span className="tabular-nums">{formatBRL(t.amount)}</span>
+              <span className="text-muted">{t.counterpartyName ?? '—'} {t.counterpartyDocument ?? ''}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  )
+}
+
+function CommentsCard({ alertId, canWrite }: { alertId: string; canWrite: boolean }) {
+  const q = useAlertComments(alertId)
+  const add = useAddAlertComment(alertId)
+  const [text, setText] = useState('')
+  return (
+    <Card title="Comentários">
+      {q.isLoading && <Skeleton className="h-12 w-full" />}
+      {q.isError && <ErrorState error={q.error} compact />}
+      {q.data && q.data.length === 0 && <EmptyState title="Nenhum comentário" />}
+      {q.data && q.data.length > 0 && (
+        <ul className="mb-3 space-y-2 text-sm">
+          {q.data.map((c) => (
+            <li key={c.id} className="rounded-lg bg-canvas p-2">
+              <p>{c.text}</p>
+              <p className="text-xs text-muted">{c.authorName} · {formatDateTime(c.createdAt)}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+      {canWrite && (
+        <form
+          className="flex gap-2"
+          onSubmit={(e) => {
+            e.preventDefault()
+            if (!text.trim()) return
+            add.mutate(text.trim(), { onSuccess: () => setText('') })
+          }}
+        >
+          <label className="sr-only" htmlFor={`comment-${alertId}`}>Novo comentário</label>
+          <input id={`comment-${alertId}`} value={text} maxLength={5000} onChange={(e) => setText(e.target.value)} placeholder="Escreva um comentário (não muda o status)" className="flex-1 rounded-lg border border-line px-3 py-2 text-sm" />
+          <Button type="submit" loading={add.isPending} disabled={!text.trim()}>
+            <Send size={14} aria-hidden /> Comentar
+          </Button>
+        </form>
+      )}
     </Card>
   )
 }
@@ -133,11 +168,11 @@ export function AlertDetailPage() {
             <div className="mb-3 flex flex-wrap gap-2">
               <SeverityBadge severity={a.severity} />
               <StatusBadge status={a.status} />
-              {a.cc4001Indicator && <Badge tone="info">Carta 4.001: {a.cc4001Indicator}</Badge>}
+              {a.rule?.carta4001Reference && <Badge tone="info">Carta 4.001: {a.rule.carta4001Reference}</Badge>}
             </div>
             {a.description && <p className="mb-3 text-sm">{a.description}</p>}
             <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <KeyValue label="Regra">{a.ruleCode ?? '—'}</KeyValue>
+              <KeyValue label="Regra">{a.rule ? `${a.rule.code} · ${a.rule.name}` : (a.ruleCode ?? '—')}</KeyValue>
               <KeyValue label="Versão da regra">{a.ruleVersion ? `v${a.ruleVersion}` : '—'}</KeyValue>
               <KeyValue label="Tipo">{a.type}</KeyValue>
               <KeyValue label="Ocorrência (fato gerador)">{formatDateTime(a.occurredAt)}</KeyValue>
@@ -151,6 +186,7 @@ export function AlertDetailPage() {
 
           <EvidenceCard a={a} />
           <LinkedTransactions a={a} />
+          <CommentsCard alertId={a.id} canWrite={can('alert:assume')} />
 
           <Card title="Histórico do alerta">
             {!a.history || a.history.length === 0 ? (
@@ -197,14 +233,14 @@ export function AlertDetailPage() {
           setDialog(null)
         }}
       />
-      <ConfirmDialog
+      <JustificationDialog
         open={dialog === 'openCase'}
         title="Abrir case a partir do alerta"
-        description="O alerta será selecionado para análise e o prazo regulatório de 45 dias para a análise será iniciado."
+        description="O alerta será selecionado para análise e o prazo regulatório de 45 dias para a análise será iniciado. A justificativa da seleção fica na trilha de auditoria."
         confirmLabel="Abrir case"
         onCancel={() => setDialog(null)}
-        onConfirm={async () => {
-          const c = await openCase.mutateAsync(a.id)
+        onConfirm={async ({ justification }) => {
+          const c = await openCase.mutateAsync({ alertId: a.id, justification })
           setDialog(null)
           void navigate(`/casos/${c.id}`)
         }}

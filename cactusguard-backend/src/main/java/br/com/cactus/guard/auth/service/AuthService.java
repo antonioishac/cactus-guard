@@ -1,6 +1,10 @@
 package br.com.cactus.guard.auth.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import br.com.cactus.guard.tenant.TenantContext;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.BadCredentialsException;
 
 import br.com.cactus.guard.auth.dto.AuthResponse;
 import br.com.cactus.guard.auth.dto.LoginRequest;
@@ -31,6 +35,7 @@ import java.util.Map;
 import java.util.List;
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -43,18 +48,39 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final PasswordEncoder passwordEncoder;
     private final AuditService auditService;
+    private final br.com.cactus.guard.tenant.service.TenantDirectory tenantDirectory;
+    private final br.com.cactus.guard.tenant.service.TenantAccessService tenantAccess;
+    private final org.springframework.transaction.support.TransactionTemplate tx;
 
     @Value("${jwt.refresh-token-expiration}")
     private long refreshTokenExpiration;
 
-    /** Sem @Transactional no metodo: a falha de login deve ser auditada mesmo com a excecao propagada. */
+    /**
+     * Sem @Transactional no metodo: a falha de login deve ser auditada mesmo com a excecao propagada.
+     * O tenant e descoberto pelo username (globalmente unico) e todo o restante roda dentro dele.
+     */
     public AuthResponse login(LoginRequest request) {
+        UUID tenantId = tenantDirectory.findTenantIdByUsername(request.getUsername()).orElse(null);
+        if (tenantId == null) {
+            // usuario inexistente: mesma excecao de credencial invalida (sem tenant nao ha onde auditar)
+            log.warn("Login negado: usuario desconhecido");
+            throw new BadCredentialsException("Credenciais invalidas");
+        }
+        return TenantContext.callAs(tenantId, () -> loginInTenant(request, tenantId));
+    }
+
+    private AuthResponse loginInTenant(LoginRequest request, UUID tenantId) {
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
         } catch (AuthenticationException e) {
             auditService.log("LOGIN_FAILURE", "USER", null, null, Map.of("username", request.getUsername()));
             throw e;
+        }
+        // Senha correta, mas tenant suspenso: 403 (so depois de autenticar, para nao revelar o estado a quem nao tem credencial)
+        if (!tenantAccess.isActive(tenantId)) {
+            auditService.log("LOGIN_DENIED_TENANT_SUSPENDED", "USER", null, null, Map.of("username", request.getUsername()));
+            throw new AccessDeniedException("Tenant suspenso");
         }
 
         User user = userRepository.findByUsername(request.getUsername())
@@ -63,9 +89,20 @@ public class AuthService {
         return issueTokens(user);
     }
 
-    @Transactional
+    /** O refresh chega sem tenant: o tenant e lido da linha do token (refresh_tokens nao tem RLS) e a rotacao roda nele. */
     public AuthResponse refresh(RefreshTokenRequest request) {
-        RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hash(request.getRefreshToken()))
+        String tokenHash = hash(request.getRefreshToken());
+        RefreshToken stored = refreshTokenRepository.findByTokenHash(tokenHash)
+                .orElseThrow(() -> new BusinessException("Invalid refresh token"));
+        UUID tenantId = stored.getTenantId();
+        if (!tenantAccess.isActive(tenantId)) {
+            throw new AccessDeniedException("Tenant suspenso");
+        }
+        return TenantContext.callAs(tenantId, () -> tx.execute(status -> rotate(tokenHash)));
+    }
+
+    private AuthResponse rotate(String tokenHash) {
+        RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(tokenHash)
                 .orElseThrow(() -> new BusinessException("Invalid refresh token"));
 
         if (refreshToken.isRevoked() || refreshToken.getExpiresAt().isBefore(Instant.now())) {
@@ -95,7 +132,7 @@ public class AuthService {
 
     private AuthResponse issueTokens(User user) {
         List<String> roles = user.getRoles().stream().map(r -> r.getName()).toList();
-        String accessToken = jwtService.generateAccessToken(user.getId(), user.getUsername(), roles);
+        String accessToken = jwtService.generateAccessToken(user.getId(), user.getUsername(), roles, user.getTenantId());
 
         byte[] raw = new byte[48];
         RANDOM.nextBytes(raw);
@@ -103,6 +140,7 @@ public class AuthService {
 
         refreshTokenRepository.save(RefreshToken.builder()
                 .tokenHash(hash(refreshTokenValue))
+                .tenantId(user.getTenantId())
                 .user(user)
                 .expiresAt(Instant.now().plusMillis(refreshTokenExpiration))
                 .revoked(false)

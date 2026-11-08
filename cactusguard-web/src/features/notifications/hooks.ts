@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { getUnreadCount, listNotifications, markNotificationRead } from '@/api/notifications'
+import { getUnreadCount, listNotifications, markAllNotificationsRead, markNotificationRead } from '@/api/notifications'
 import type { UUID } from '@/api/types'
 
 export const NOTIFICATION_POLL_MS = 30_000
@@ -15,6 +15,15 @@ export const useMarkRead = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: UUID) => markNotificationRead(id),
+    meta: { silent: true },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ['notifications'] }),
+  })
+}
+
+export const useMarkAllRead = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: markAllNotificationsRead,
     meta: { silent: true },
     onSuccess: () => void qc.invalidateQueries({ queryKey: ['notifications'] }),
   })

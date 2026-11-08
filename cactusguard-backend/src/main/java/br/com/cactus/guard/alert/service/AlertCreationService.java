@@ -7,6 +7,9 @@ import br.com.cactus.guard.alert.entity.AlertTransaction;
 import br.com.cactus.guard.alert.repository.AlertRepository;
 import br.com.cactus.guard.alert.repository.AlertTransactionRepository;
 import br.com.cactus.guard.common.calendar.RegulatoryDeadlines;
+import br.com.cactus.guard.event.dto.DomainEventType;
+import br.com.cactus.guard.event.service.DomainEventPublisher;
+import br.com.cactus.guard.event.service.EventPayloads;
 import br.com.cactus.guard.party.entity.Party;
 import br.com.cactus.guard.rule.entity.MonitoringRule;
 import br.com.cactus.guard.transaction.entity.Transaction;
@@ -35,6 +38,7 @@ public class AlertCreationService {
     private final AlertTransactionRepository alertTransactionRepository;
     private final RegulatoryDeadlines deadlines;
     private final ApplicationEventPublisher eventPublisher;
+    private final DomainEventPublisher events;
 
     /** Dados de um alerta a ser criado. */
     public record AlertDraft(Party party,
@@ -88,8 +92,9 @@ public class AlertCreationService {
                 .selectionDeadline(deadlines.selectionDeadline(occurredAt))
                 .build();
         alert = alertRepository.save(alert);
+        events.publish(DomainEventType.ALERT_CREATED, alert.getId(), EventPayloads.alertCreated(alert));
         if ("CRITICAL".equals(alert.getSeverity())) {
-            eventPublisher.publishEvent(new CriticalAlertCreatedEvent(alert.getId()));
+            eventPublisher.publishEvent(new CriticalAlertCreatedEvent(alert.getId(), br.com.cactus.guard.tenant.TenantContext.require()));
         }
         for (Transaction t : txns) {
             alertTransactionRepository.save(AlertTransaction.builder().alert(alert).transaction(t).build());

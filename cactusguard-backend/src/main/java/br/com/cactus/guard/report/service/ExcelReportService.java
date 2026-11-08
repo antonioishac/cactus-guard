@@ -36,7 +36,7 @@ public class ExcelReportService {
             job.setStartedAt(Instant.now());
             jobRepository.save(job);
 
-            Path outputDir = Path.of(outputDirName);
+            Path outputDir = Path.of(outputDirName).resolve(br.com.cactus.guard.tenant.TenantContext.require().toString());
             Files.createDirectories(outputDir);
             String fileName = job.getReportCode() + "_" + job.getId() + ".xlsx";
             Path filePath = outputDir.resolve(fileName);

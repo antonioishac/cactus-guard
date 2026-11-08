@@ -1,5 +1,8 @@
 package br.com.cactus.guard.rule.engine;
 
+import br.com.cactus.guard.event.dto.DomainEventType;
+import br.com.cactus.guard.event.service.DomainEventPublisher;
+import br.com.cactus.guard.event.service.EventPayloads;
 import br.com.cactus.guard.common.audit.AuditPayload;
 import br.com.cactus.guard.audit.service.AuditService;
 import br.com.cactus.guard.case_.entity.Case;
@@ -57,6 +60,7 @@ public class RiskScoringService {
     private final CaseRepository caseRepository;
     private final RiskHistoryService riskHistoryService;
     private final AuditService auditService;
+    private final DomainEventPublisher events;
 
     /** CNAEs (prefixo, so digitos) de atividades de risco; configuravel - ajustar a politica da instituicao. */
     @Value("${cactus.risk.high-risk-cnaes:9200,6499,6612,6821,4511,4789,6911,9492}")
@@ -155,6 +159,10 @@ public class RiskScoringService {
             after.put("trigger", trigger);
             after.put("eddRequired", party.isEddRequired());
             AuditPayload.log(auditService, "RISK_RECALCULATED", "PARTY", party.getId(), before, after);
+            if (!a.level().equals(previousLevel)) {
+                events.publish(DomainEventType.PARTY_RISK_CHANGED, party.getId(), EventPayloads.partyRiskChanged(
+                        party.getId(), previousLevel, a.level(), previousScore, a.score(), trigger));
+            }
         }
     }
 

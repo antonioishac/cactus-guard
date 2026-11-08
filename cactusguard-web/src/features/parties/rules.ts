@@ -54,7 +54,7 @@ export function isRecentCompany(incorporationDate: string | null | undefined, no
 }
 
 export const directionLabel = (d: string | null | undefined) =>
-  d === 'CREDIT' || d === 'IN' ? 'Crédito (entrada)' : d === 'DEBIT' || d === 'OUT' ? 'Débito (saída)' : '—'
+  d === 'IN' ? 'Entrada' : d === 'OUT' ? 'Saída' : '—'
 
 /** Percentual efetivo = produto dos percentuais da cadeia (cada elo em %). */
 export function effectivePct(pcts: (number | null)[]): number | null {

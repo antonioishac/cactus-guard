@@ -17,11 +17,24 @@ export type SiscoafStatus =
   | 'CANCELLED'
   | 'RECTIFIED'
 
+/** Linha de `siscoaf_history` (só no detalhe). */
+export interface SiscoafHistoryEntry {
+  action: string
+  status: string
+  fromStatus: string | null
+  byId: UUID | null
+  byName: string | null
+  reason: string | null
+  at: ISODateTime
+}
+
 /** SiscoafResponse do backend. */
 export interface SiscoafCommunication {
   id: UUID
   caseId: UUID | null
+  caseNumber: string | null
   partyId: UUID | null
+  partyName: string | null
   transactionId: UUID | null
   originalCommunicationId: UUID | null
   type: SiscoafType | string
@@ -33,36 +46,45 @@ export interface SiscoafCommunication {
   decidedAt: ISODateTime | null
   referenceYear: number | null
   amount: number | null
+  /** indícios Carta 4.001 */
+  indicatorCodes: string[] | null
+  periodFrom: ISODate | null
+  periodTo: ISODate | null
   cancelledAt: ISODateTime | null
+  cancelReason: string | null
+  createdById: UUID | null
+  approvedById: UUID | null
+  approvedAt: ISODateTime | null
+  /** PEP, risco alto/crítico ou EDD: aprovador != decisor e != criador; submit de DRAFT é bloqueado sem aprovação */
+  fourEyesRequired: boolean
   payload: Record<string, unknown> | null
   createdAt: ISODateTime
-  /* ---- NÃO existem no SiscoafResponse real (campos da entity/spec; opcionais) ---- */
-  /** indícios Carta 4.001 (entity.indicatorCodes não é exposta no DTO) */
-  indicatorCodes?: string[] | null
-  partyName?: string | null
-  cancelReason?: string | null
-  /** período de referência da operação */
-  periodFrom?: ISODate | null
-  periodTo?: ISODate | null
+  /** só em GET /siscoaf/{id} */
   statusHistory?: SiscoafHistoryEntry[] | null
 }
 
-export interface SiscoafHistoryEntry {
-  status: string
-  at: ISODateTime
-  byName?: string | null
-  reason?: string | null
-}
-
+/** `status` e `type` aceitam vários valores (CSV). Sem `status` = todos (não assumir DRAFT). */
 export interface SiscoafFilters {
-  /** backend: obrigatório na prática (default DRAFT); aceita um único status */
   status?: string
-  /** PROPOSTO: backend ignora hoje */
   type?: string
+  from?: string
+  to?: string
+  partyId?: UUID
+  caseId?: UUID
 }
 
-/** Backend: `reason` obrigatório (cancelar/retificar) e `payload` opcional (retificar). */
+/** `reason` obrigatório (cancelar/retificar) e `payload` opcional (retificar). */
 export interface SiscoafReasonRequest {
   reason: string
   payload?: Record<string, unknown>
+}
+
+/** POST /siscoaf/{id}/approve: `comment` (ou `justification`) >= 20 não brancos. */
+export interface SiscoafApproveRequest {
+  comment: string
+}
+
+/** POST /siscoaf/{id}/submit: `reason` opcional (>= 20 se informado). */
+export interface SiscoafSubmitRequest {
+  reason?: string
 }
