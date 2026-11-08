@@ -8,9 +8,17 @@ import javax.crypto.Cipher;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Base64;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+/**
+ * AES-256-GCM. Formato gravado: {@code <versao>:<base64(iv || ciphertext+tag)>} (ex.: {@code v1:...}).
+ * Dados legados sem prefixo continuam legiveis (ver {@link EncryptionKeyring}) e sao regravados
+ * com prefixo na proxima escrita. Nunca registra valores em log.
+ */
 @Slf4j
 @Converter
 public class EncryptedStringConverter implements AttributeConverter<String, String> {
@@ -18,49 +26,61 @@ public class EncryptedStringConverter implements AttributeConverter<String, Stri
     private static final String ALGORITHM = "AES/GCM/NoPadding";
     private static final int GCM_TAG_LENGTH = 128;
     private static final int GCM_IV_LENGTH = 12;
-    private static final String SECRET_KEY = System.getenv().getOrDefault("ENCRYPTION_KEY", "cactusguard-dev-key-32-bytes!!");
+    private static final Pattern PREFIX = Pattern.compile("^([A-Za-z0-9_-]{1,16}):(.*)$", Pattern.DOTALL);
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     @Override
     public String convertToDatabaseColumn(String attribute) {
         if (attribute == null) return null;
+        EncryptionKeyring ring = EncryptionKeyring.current();
         try {
             byte[] iv = new byte[GCM_IV_LENGTH];
-            new SecureRandom().nextBytes(iv);
-
+            RANDOM.nextBytes(iv);
             Cipher cipher = Cipher.getInstance(ALGORITHM);
-            SecretKeySpec keySpec = new SecretKeySpec(SECRET_KEY.getBytes(StandardCharsets.UTF_8), "AES");
-            cipher.init(Cipher.ENCRYPT_MODE, keySpec, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
-
+            cipher.init(Cipher.ENCRYPT_MODE, new SecretKeySpec(ring.activeKey(), "AES"),
+                    new GCMParameterSpec(GCM_TAG_LENGTH, iv));
             byte[] encrypted = cipher.doFinal(attribute.getBytes(StandardCharsets.UTF_8));
             byte[] combined = new byte[iv.length + encrypted.length];
             System.arraycopy(iv, 0, combined, 0, iv.length);
             System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length);
-
-            return Base64.getEncoder().encodeToString(combined);
-        } catch (Exception e) {
-            log.error("Encryption failed", e);
-            throw new RuntimeException("Encryption failed", e);
+            return ring.activeVersion() + ":" + Base64.getEncoder().encodeToString(combined);
+        } catch (GeneralSecurityException e) {
+            log.error("Falha ao cifrar atributo");
+            throw new IllegalStateException("Encryption failed");
         }
     }
 
     @Override
     public String convertToEntityAttribute(String dbData) {
         if (dbData == null) return null;
+        EncryptionKeyring ring = EncryptionKeyring.current();
         try {
-            byte[] combined = Base64.getDecoder().decode(dbData);
-            byte[] iv = new byte[GCM_IV_LENGTH];
-            byte[] encrypted = new byte[combined.length - GCM_IV_LENGTH];
-            System.arraycopy(combined, 0, iv, 0, GCM_IV_LENGTH);
-            System.arraycopy(combined, GCM_IV_LENGTH, encrypted, 0, encrypted.length);
-
-            Cipher cipher = Cipher.getInstance(ALGORITHM);
-            SecretKeySpec keySpec = new SecretKeySpec(SECRET_KEY.getBytes(StandardCharsets.UTF_8), "AES");
-            cipher.init(Cipher.DECRYPT_MODE, keySpec, new GCMParameterSpec(GCM_TAG_LENGTH, iv));
-
-            return new String(cipher.doFinal(encrypted), StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            log.error("Decryption failed", e);
-            throw new RuntimeException("Decryption failed", e);
+            Matcher m = PREFIX.matcher(dbData);
+            if (m.matches() && ring.key(m.group(1)) != null) {
+                return decrypt(ring.key(m.group(1)), Base64.getDecoder().decode(m.group(2)));
+            }
+            byte[] raw = Base64.getDecoder().decode(dbData);
+            for (byte[] candidate : ring.legacyCandidates()) {
+                try {
+                    return decrypt(candidate, raw);
+                } catch (GeneralSecurityException ignored) {
+                    // tenta a proxima chave
+                }
+            }
+            throw new GeneralSecurityException("no key");
+        } catch (GeneralSecurityException | IllegalArgumentException e) {
+            log.error("Falha ao decifrar atributo (chave/versao desconhecida ou dado corrompido)");
+            throw new IllegalStateException("Decryption failed");
         }
+    }
+
+    private static String decrypt(byte[] key, byte[] combined) throws GeneralSecurityException {
+        if (combined.length <= GCM_IV_LENGTH) {
+            throw new GeneralSecurityException("short");
+        }
+        Cipher cipher = Cipher.getInstance(ALGORITHM);
+        cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key, "AES"),
+                new GCMParameterSpec(GCM_TAG_LENGTH, combined, 0, GCM_IV_LENGTH));
+        return new String(cipher.doFinal(combined, GCM_IV_LENGTH, combined.length - GCM_IV_LENGTH), StandardCharsets.UTF_8);
     }
 }

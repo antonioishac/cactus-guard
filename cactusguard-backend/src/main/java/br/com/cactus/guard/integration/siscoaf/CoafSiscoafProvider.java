@@ -1,5 +1,7 @@
 package br.com.cactus.guard.integration.siscoaf;
 
+import org.springframework.web.client.RestClient;
+
 import br.com.cactus.guard.siscoaf.entity.SiscoafCommunication;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

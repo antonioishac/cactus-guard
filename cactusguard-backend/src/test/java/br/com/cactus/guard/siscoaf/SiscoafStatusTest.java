@@ -58,7 +58,8 @@ class SiscoafStatusTest {
         var submitted = siscoafService.submit(draft.getId());
 
         assertNotNull(submitted.getProtocolNumber());
-        assertTrue(submitted.getProtocolNumber().startsWith("SIS-"));
+        // protocolo vem do provider; no perfil test o MockSiscoafProvider gera "MOCK-<epoch>"
+        assertTrue(submitted.getProtocolNumber().startsWith("MOCK-"));
         assertEquals("SUBMITTED", submitted.getStatus());
     }
 }

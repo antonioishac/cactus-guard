@@ -1,5 +1,7 @@
 package br.com.cactus.guard.screening.service;
 
+import br.com.cactus.guard.audit.service.DataAccessService;
+
 import br.com.cactus.guard.alert.entity.Alert;
 import br.com.cactus.guard.alert.repository.AlertRepository;
 import br.com.cactus.guard.integration.screening.ScreeningOrchestrator;
@@ -7,6 +9,8 @@ import br.com.cactus.guard.party.entity.Party;
 import br.com.cactus.guard.party.repository.PartyRepository;
 import br.com.cactus.guard.screening.dto.ScreeningResultResponse;
 import br.com.cactus.guard.screening.entity.ScreeningResult;
+import br.com.cactus.guard.screening.entity.ScreeningList;
+import br.com.cactus.guard.screening.repository.ScreeningListRepository;
 import br.com.cactus.guard.screening.repository.ScreeningResultRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,6 +35,7 @@ public class ScreeningService {
     private final PartyRepository partyRepository;
     private final AlertRepository alertRepository;
     private final DataAccessService dataAccessService;
+    private final ScreeningListRepository listRepository;
 
     @Async
     @Transactional
@@ -54,6 +59,12 @@ public class ScreeningService {
         return resultRepository.findByPartyId(partyId).stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    /** Listas restritivas (PEP, sanções) ativas para screening. */
+    @Transactional(readOnly = true)
+    public List<ScreeningList> findAllLists() {
+        return listRepository.findByActiveTrueOrderByCodeAsc();
     }
 
     @Transactional(readOnly = true)

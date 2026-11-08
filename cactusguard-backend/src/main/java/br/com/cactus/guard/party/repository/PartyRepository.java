@@ -1,5 +1,7 @@
 package br.com.cactus.guard.party.repository;
 
+import org.springframework.data.jpa.repository.JpaRepository;
+
 import br.com.cactus.guard.party.entity.Party;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

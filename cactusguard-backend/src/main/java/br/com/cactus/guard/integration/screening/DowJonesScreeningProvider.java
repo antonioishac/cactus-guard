@@ -35,7 +35,7 @@ public class DowJonesScreeningProvider implements ScreeningProviderPort {
     @CircuitBreaker(name = "screening", fallbackMethod = "screenFallback")
     @Retry(name = "screening")
     public ScreeningResult screen(Party party, List<String> listCodes) {
-        log.info("Dow Jones screening for: {}", party.getDocument());
+        log.info("Dow Jones screening for: {}", br.com.cactus.guard.common.util.DataMasker.maskDocument(party.getDocument()));
 
         Map<String, Object> request = Map.of(
                 "document", party.getDocument(),

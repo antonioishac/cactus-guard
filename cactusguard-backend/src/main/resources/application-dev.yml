@@ -1,0 +1,29 @@
+# Perfil de desenvolvimento local. NUNCA usar em producao: segredos publicos.
+jwt:
+  secret: dev-only-jwt-secret-key-not-for-production-use-0123456789
+security:
+  crypto:
+    keys: v1:ZGV2LW9ubHktZW5jcnlwdGlvbi1rZXktMzJieXRlcyE=
+    active-version: v1
+    legacy-key: cactusguard-dev-key-32-bytes!!
+  document-hash:
+    key: dev-only-document-hash-pepper-0123456789abcdef
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:5173
+  hsts:
+    enabled: false
+  admin-bootstrap:
+    password: admin123
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+server:
+  servlet:
+    session:
+      cookie:
+        secure: false
+logging:
+  level:
+    br.com.cactus.guard: DEBUG

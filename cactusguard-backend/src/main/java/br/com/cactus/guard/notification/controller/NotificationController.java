@@ -1,5 +1,6 @@
 package br.com.cactus.guard.notification.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import br.com.cactus.guard.notification.entity.Notification;
 import br.com.cactus.guard.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class NotificationController {
     private final NotificationService notificationService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<Page<Notification>> findMy(
             @RequestParam(defaultValue = "false") boolean unreadOnly,
             Pageable pageable) {
@@ -26,11 +28,13 @@ public class NotificationController {
     }
 
     @GetMapping("/unread-count")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<Map<String, Long>> countUnread() {
         return ResponseEntity.ok(Map.of("count", notificationService.countUnread()));
     }
 
     @PostMapping("/{id}/read")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<Void> markAsRead(@PathVariable UUID id) {
         notificationService.markAsRead(id);
         return ResponseEntity.noContent().build();

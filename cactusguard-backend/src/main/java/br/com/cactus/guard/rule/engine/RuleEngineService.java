@@ -1,5 +1,8 @@
 package br.com.cactus.guard.rule.engine;
 
+import br.com.cactus.guard.rule.repository.MonitoringRuleRepository;
+import br.com.cactus.guard.party.repository.PartyRepository;
+
 import br.com.cactus.guard.alert.entity.Alert;
 import br.com.cactus.guard.alert.repository.AlertRepository;
 import br.com.cactus.guard.party.entity.Party;
@@ -147,7 +150,7 @@ public class RuleEngineService {
         int generated = 0;
 
         for (br.com.cactus.guard.party.entity.Party party : parties) {
-            var txns = transactionRepository.findByPartyIdAndOccurredAtAfter(party.getId(), since);
+            var txns = transactionRepository.findByPartyIdAndTransactionDateAfter(party.getId(), since);
             long nearThreshold = txns.stream()
                     .filter(t -> t.getAmount() != null && t.getAmount().compareTo(threshold.multiply(new BigDecimal("0.8"))) >= 0
                             && t.getAmount().compareTo(threshold) < 0)
@@ -175,7 +178,7 @@ public class RuleEngineService {
         int generated = 0;
 
         for (br.com.cactus.guard.party.entity.Party party : parties) {
-            var recentTxns = transactionRepository.findByPartyIdAndOccurredAtAfter(party.getId(), since);
+            var recentTxns = transactionRepository.findByPartyIdAndTransactionDateAfter(party.getId(), since);
             if (recentTxns.size() < 5) continue;
 
             BigDecimal avg = recentTxns.stream()

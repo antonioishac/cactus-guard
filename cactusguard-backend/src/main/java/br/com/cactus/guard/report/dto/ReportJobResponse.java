@@ -14,7 +14,8 @@ public class ReportJobResponse {
     private String status;
     private String format;
     private Map<String, Object> parameters;
-    private String filePath;
+    /** Indica se ha arquivo para download. O caminho no servidor nunca e exposto. */
+    private boolean downloadable;
     private Instant createdAt;
     private Instant completedAt;
 }

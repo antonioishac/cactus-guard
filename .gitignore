@@ -1,0 +1,31 @@
+# Build
+target/
+dist/
+build/
+node_modules/
+*.tsbuildinfo
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+
+# Segredos e ambiente
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Arquivos gerados em runtime (podem conter PII/dados de PLD)
+# Relatórios PDF/Excel: ReportGenerationService/ExcelReportService gravam em Path.of("reports")
+reports/
+uploads/
+storage/
+
+# Claude Code (config pessoal)
+.claude/settings.local.json
+CLAUDE.local.md

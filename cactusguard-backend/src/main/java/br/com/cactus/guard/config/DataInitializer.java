@@ -21,9 +21,17 @@ public class DataInitializer implements CommandLineRunner {
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
 
+    /** Sem default: em producao o admin so e criado se ADMIN_BOOTSTRAP_PASSWORD for informada. */
+    @org.springframework.beans.factory.annotation.Value("${security.admin-bootstrap.password:}")
+    private String bootstrapPassword;
+
     @Override
     public void run(String... args) {
         if (userRepository.count() == 0) {
+            if (bootstrapPassword == null || bootstrapPassword.length() < 8) {
+                log.warn("Nenhum usuario existente e ADMIN_BOOTSTRAP_PASSWORD nao informada: admin inicial NAO criado");
+                return;
+            }
             log.info("Criando usuário admin inicial...");
 
             Role adminRole = roleRepository.findByName("ADMIN")
@@ -35,14 +43,14 @@ public class DataInitializer implements CommandLineRunner {
             User admin = User.builder()
                     .username("admin")
                     .email("admin@cactusguard.com")
-                    .password(passwordEncoder.encode("admin123"))
+                    .password(passwordEncoder.encode(bootstrapPassword))
                     .name("Administrador")
                     .active(true)
                     .roles(Set.of(adminRole))
                     .build();
 
             userRepository.save(admin);
-            log.info("Usuário admin criado. Username: admin | Password: admin123");
+            log.info("Usuario admin inicial criado (username: admin). Troque a senha no primeiro acesso.");
         }
     }
 }

@@ -23,7 +23,9 @@ services:
       - "8080:8080"
     depends_on:
       - postgres
+      - redis
     environment:
+      REDIS_HOST: redis
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/cactusguard
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres

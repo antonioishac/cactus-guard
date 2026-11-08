@@ -8,6 +8,10 @@ import br.com.cactus.guard.alert.repository.AlertRepository;
 import br.com.cactus.guard.auth.entity.User;
 import br.com.cactus.guard.auth.repository.UserRepository;
 import br.com.cactus.guard.notification.service.NotificationService;
+import br.com.cactus.guard.audit.service.AuditService;
+import br.com.cactus.guard.common.exception.BusinessException;
+import br.com.cactus.guard.common.security.CurrentUserService;
+import br.com.cactus.guard.common.validation.Justifications;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -16,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -25,6 +30,9 @@ public class AlertService {
     private final AlertRepository alertRepository;
     private final AlertHistoryRepository alertHistoryRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
+    private final AuditService auditService;
+    private final CurrentUserService currentUser;
 
     @Transactional(readOnly = true)
     public Page<AlertResponse> findAll(String status, String severity, Pageable pageable) {
@@ -37,6 +45,11 @@ public class AlertService {
             page = alertRepository.findAll(pageable);
         }
         return page.map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AlertResponse> findBySeverity(String severity, Pageable pageable) {
+        return alertRepository.findBySeverity(severity, pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -74,19 +87,41 @@ public class AlertService {
     }
 
     @Transactional
-    public AlertResponse markFalsePositive(UUID alertId, String comment) {
+    public AlertResponse markFalsePositive(UUID alertId, String justification) {
+        return markFalsePositive(alertId, "OTHER", justification);
+    }
+
+    /**
+     * Encerra o alerta como falso positivo. Justificativa obrigatoria; grava a taxonomia
+     * (falsePositiveReason), quem encerrou e quando (alimenta a calibracao das regras).
+     */
+    @Transactional
+    public AlertResponse markFalsePositive(UUID alertId, String reason, String justification) {
+        if (reason == null || reason.isBlank()) {
+            throw new BusinessException("Motivo do falso positivo e obrigatorio");
+        }
+        String just = Justifications.require(justification, "marcar alerta como falso positivo");
         Alert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new IllegalArgumentException("Alert not found"));
+        if ("FALSE_POSITIVE".equals(alert.getStatus()) || "CLOSED".equals(alert.getStatus())) {
+            throw new BusinessException("Alerta ja encerrado");
+        }
 
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByUsername(username).orElse(null);
-
+        User user = currentUser.user().orElse(null);
         String fromStatus = alert.getStatus();
+        Instant now = Instant.now();
         alert.setStatus("FALSE_POSITIVE");
-        alert.setClosedAt(Instant.now());
+        alert.setClosedAt(now);
+        alert.setClosedBy(user);
+        alert.setClosureReason("FALSE_POSITIVE");
+        alert.setFalsePositiveReason(reason.trim());
+        alert.setClosureJustification(just);
         alert = alertRepository.save(alert);
 
-        saveHistory(alert, "FALSE_POSITIVE", fromStatus, "FALSE_POSITIVE", user, comment);
+        saveHistory(alert, "FALSE_POSITIVE", fromStatus, "FALSE_POSITIVE", user, just);
+        auditService.log("ALERT_FALSE_POSITIVE", "ALERT", alert.getId(),
+                Map.of("status", fromStatus),
+                Map.of("status", "FALSE_POSITIVE", "falsePositiveReason", reason.trim(), "justification", just));
         return toResponse(alert);
     }
 
@@ -115,6 +150,11 @@ public class AlertService {
                 .ruleCode(alert.getRuleCode())
                 .assignedToId(alert.getAssignedTo() != null ? alert.getAssignedTo().getId() : null)
                 .dueDate(alert.getDueDate())
+                .occurredAt(alert.getOccurredAt())
+                .selectionDeadline(alert.getSelectionDeadline())
+                .ruleVersion(alert.getRuleVersion())
+                .totalAmount(alert.getTotalAmount())
+                .falsePositiveReason(alert.getFalsePositiveReason())
                 .createdAt(alert.getCreatedAt())
                 .build();
     }

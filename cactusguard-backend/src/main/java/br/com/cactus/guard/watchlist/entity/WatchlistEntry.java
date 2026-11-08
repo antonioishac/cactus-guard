@@ -1,6 +1,6 @@
 package br.com.cactus.guard.watchlist.entity;
 
-import br.com.cactus.guard.user.entity.User;
+import br.com.cactus.guard.auth.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.Instant;

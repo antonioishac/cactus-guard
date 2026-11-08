@@ -16,6 +16,9 @@ class PartyUpdateTest {
     @Autowired
     private PartyService partyService;
 
+    @Autowired
+    private br.com.cactus.guard.party.repository.PartyRepository partyRepository;
+
     @Test
     void updatePartyShouldPersistChanges() {
         PartyRequest create = new PartyRequest();
@@ -34,6 +37,8 @@ class PartyUpdateTest {
 
         var updated = partyService.update(created.getId(), update);
         assertEquals("Updated Name", updated.getName());
-        assertEquals("updated@email.com", updated.getEmail());
+        // resposta mascara o e-mail (LGPD); o valor real persiste criptografado e e decifrado pela entity
+        assertEquals("u***d@email.com", updated.getEmail());
+        assertEquals("updated@email.com", partyRepository.findById(created.getId()).orElseThrow().getEmail());
     }
 }

@@ -28,6 +28,6 @@ class MigrationBatchCreateTest {
         assertEquals(0, batch.getTotalRecords());
 
         MigrationBatch persisted = batchRepository.findById(batch.getId()).orElseThrow();
-        assertEquals("CREATE_TEST", persisted.getName());
+        assertEquals("CREATE_TEST", persisted.getSourceSystem());
     }
 }

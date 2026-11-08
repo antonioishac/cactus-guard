@@ -12,7 +12,7 @@
 - Fragmentação de depósitos/saques para evitar limiares.
 - Valores incompatíveis com atividade ou capacidade financeira.
 - Aumentos súbitos seguidos de transferências rápidas.
-- Comunicação automática: espécie ≥ R$ 50.000,00.
+- Comunicação automática: espécie ≥ R$ 50.000,00 (depósito, aporte, saque e pedido de provisionamento de saque) — ver 003.
 
 ### II - Moeda estrangeira em espécie e cartões pré-pagos
 - Movimentações atípicas ou incompatíveis.
@@ -41,7 +41,7 @@
 ### VII a XVII (outros)
 - Recursos de contratos com setor público.
 - Consórcios (quantidade de cotas incompatível, lances atípicos).
-- Pessoas/entidades suspeitas de terrorismo (listas CSNU).
+- Pessoas/entidades suspeitas de terrorismo (listas CSNU) — hit confirmado também exige indisponibilidade imediata de ativos (Lei 13.810/2019, Res. BCB 44/2020; ver 003 e 011).
 - Atividades internacionais e jurisdições de alto risco (GAFI).
 - Funcionários, parceiros e prestadores.
 - Campanhas eleitorais.

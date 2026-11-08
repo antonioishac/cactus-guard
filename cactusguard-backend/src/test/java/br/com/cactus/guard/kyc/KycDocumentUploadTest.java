@@ -35,7 +35,7 @@ class KycDocumentUploadTest {
         party = partyRepository.save(party);
 
         var process = kycService.startOnboarding(party.getId());
-        byte[] content = "PDF content here".getBytes();
+        byte[] content = "%PDF-1.4 PDF content here".getBytes();
 
         var doc = documentService.addDocument(process.getId(), "RG", "rg.pdf", content, "application/pdf");
 

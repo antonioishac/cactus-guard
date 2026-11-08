@@ -22,7 +22,7 @@ public class KycExpirationJob {
     @Transactional
     public void expireOverdueProcesses() {
         Instant now = Instant.now();
-        List<KycProcess> overdue = repository.findByStatusAndDueDateBefore("IN_PROGRESS", now);
+        List<KycProcess> overdue = repository.findByStatusAndExpiresAtBefore("IN_PROGRESS", now);
 
         for (KycProcess process : overdue) {
             process.setStatus("EXPIRED");

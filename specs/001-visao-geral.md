@@ -30,5 +30,6 @@ A solução deve ser aderente às principais normas brasileiras:
 ## Referências
 
 - `CLAUDE.md` (resumo de alto nível)
-- Diagramas: `PLD_Arquitetura_Negocio.drawio` e `PLD_Modelo_Dados.drawio`
-- Modelo detalhado: `PLD_Modelo_Dados_Detalhado.md`
+- Modelo de dados: `002-modelo-dados.md` + catálogo de campos `046-catalogo-campos-pld.md`
+- Índice e status de implementação: `README.md`
+- Diagramas de arquitetura: ainda não versionados no repositório (pendente).

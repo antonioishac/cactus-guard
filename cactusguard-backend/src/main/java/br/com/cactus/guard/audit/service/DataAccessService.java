@@ -2,8 +2,8 @@ package br.com.cactus.guard.audit.service;
 
 import br.com.cactus.guard.audit.entity.DataAccessLog;
 import br.com.cactus.guard.audit.repository.DataAccessLogRepository;
-import br.com.cactus.guard.user.entity.User;
-import br.com.cactus.guard.user.repository.UserRepository;
+import br.com.cactus.guard.auth.entity.User;
+import br.com.cactus.guard.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

@@ -4,8 +4,11 @@ import br.com.cactus.guard.auth.entity.User;
 import br.com.cactus.guard.party.entity.Party;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -37,6 +40,28 @@ public class ScreeningResult {
 
     @Column(name = "match_type", length = 30)
     private String matchType;
+
+    // ===================== Campos PLD (V28) =====================
+
+    /** Tipo da lista: PEP, SANCTION, CSNU, HIGH_RISK_JURISDICTION, ADVERSE_MEDIA, INTERNAL. */
+    @Column(name = "list_type", length = 30)
+    private String listType;
+
+    /** Nome encontrado na lista (pode diferir do nome cadastrado da parte). */
+    @Column(name = "matched_name")
+    private String matchedName;
+
+    /** Dados do hit: aliases, data de nascimento, nacionalidade, programa de sancao etc. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "details")
+    private Map<String, Object> details;
+
+    @Column(name = "review_justification", columnDefinition = "TEXT")
+    private String reviewJustification;
+
+    /** Proxima rechecagem prevista. */
+    @Column(name = "next_due_at")
+    private Instant nextDueAt;
 
     @Column(length = 20)
     private String status = "PENDING";

@@ -9,5 +9,6 @@ import java.util.UUID;
 public interface MonitoringRuleRepository extends JpaRepository<MonitoringRule, UUID> {
     Optional<MonitoringRule> findByCode(String code);
     List<MonitoringRule> findByActiveTrue();
+    long countByActiveTrue();
     List<MonitoringRule> findByCategoryAndActiveTrue(String category);
 }

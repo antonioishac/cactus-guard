@@ -1,7 +1,7 @@
 package br.com.cactus.guard.risk.entity;
 
 import br.com.cactus.guard.party.entity.Party;
-import br.com.cactus.guard.user.entity.User;
+import br.com.cactus.guard.auth.entity.User;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;

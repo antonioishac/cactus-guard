@@ -24,6 +24,7 @@ Gestão completa de cases e construção do dossiê, consumindo integralmente os
 ## Regras de tela e UX
 - Justificativa obrigatória e com tamanho mínimo em decisões.
 - Confirmação modal em decisões e fechamento.
+- Botões de decisão: **Comunicar** / **Arquivar**. **Escalar** é ação separada (não encerra o case). Cases de PEP/alto risco/EDD exibem estado "Aguardando aprovação"; o autor da decisão não vê o botão Aprovar (ver 012, 033).
 - Loading e empty states em todas as seções.
 - Botões condicionados a roles e ao status atual do case.
 - Feedback claro após cada ação.

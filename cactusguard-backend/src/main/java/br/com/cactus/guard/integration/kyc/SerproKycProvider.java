@@ -1,5 +1,7 @@
 package br.com.cactus.guard.integration.kyc;
 
+import org.springframework.web.client.RestClient;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -45,12 +47,12 @@ public class SerproKycProvider implements KycProviderPort {
 
     @Override
     public boolean validateBiometric(byte[] image, String document) {
-        log.info("Serpro biometric validation for: {}", document);
+        log.info("Serpro biometric validation for: {}", br.com.cactus.guard.common.util.DataMasker.maskDocument(document));
         return image != null && image.length > 0;
     }
 
     public boolean validateDocumentFallback(String document, String type, Throwable t) {
-        log.warn("KYC fallback triggered for document: {}", t.getMessage());
+        log.warn("KYC fallback triggered: {}", t.getClass().getSimpleName());
         return false;
     }
 }

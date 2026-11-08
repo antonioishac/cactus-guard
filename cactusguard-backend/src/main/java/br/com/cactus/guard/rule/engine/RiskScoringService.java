@@ -1,5 +1,7 @@
 package br.com.cactus.guard.rule.engine;
 
+import br.com.cactus.guard.risk.service.RiskHistoryService;
+
 import br.com.cactus.guard.party.entity.Party;
 import br.com.cactus.guard.party.repository.PartyRepository;
 import br.com.cactus.guard.rule.entity.MonitoringRule;
@@ -30,15 +32,30 @@ public class RiskScoringService {
             String previousLevel = party.getRiskLevel();
             String newLevel = calculateRisk(party);
             
+            java.math.BigDecimal previousScore = party.getRiskScore();
+            java.math.BigDecimal newScore = scoreForLevel(newLevel);
+
             if (!newLevel.equals(previousLevel)) {
-                riskHistoryService.record(party, null, null, previousLevel, newLevel, 
+                // risk_history.new_score e NOT NULL (V15): registra o score representativo do nivel
+                riskHistoryService.record(party, previousScore, newScore, previousLevel, newLevel,
                         "Recálculo automático", null);
             }
-            
+
             party.setRiskLevel(newLevel);
+            party.setRiskScore(newScore);
             partyRepository.save(party);
         }
         log.info("Risk scores recalculated for {} parties", parties.size());
+    }
+
+    /** Score numerico (0-100) representativo de cada nivel de risco calculado. */
+    static java.math.BigDecimal scoreForLevel(String level) {
+        return switch (level) {
+            case "CRITICAL" -> java.math.BigDecimal.valueOf(100);
+            case "HIGH" -> java.math.BigDecimal.valueOf(75);
+            case "MEDIUM" -> java.math.BigDecimal.valueOf(50);
+            default -> java.math.BigDecimal.valueOf(25);
+        };
     }
 
     public String calculateRisk(Party party) {

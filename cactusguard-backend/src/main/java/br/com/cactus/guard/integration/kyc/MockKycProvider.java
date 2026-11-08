@@ -11,13 +11,13 @@ public class MockKycProvider implements KycProviderPort {
 
     @Override
     public boolean validateDocument(String document, String type) {
-        log.info("Mock KYC validate document: {}", document);
+        log.info("Mock KYC validate document: {}", br.com.cactus.guard.common.util.DataMasker.maskDocument(document));
         return document != null && document.length() >= 11;
     }
 
     @Override
     public boolean validateBiometric(byte[] image, String document) {
-        log.info("Mock KYC validate biometric for: {}", document);
+        log.info("Mock KYC validate biometric for: {}", br.com.cactus.guard.common.util.DataMasker.maskDocument(document));
         return image != null && image.length > 0;
     }
 }

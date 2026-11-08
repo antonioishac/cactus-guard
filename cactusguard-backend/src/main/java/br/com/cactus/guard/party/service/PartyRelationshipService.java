@@ -1,5 +1,7 @@
 package br.com.cactus.guard.party.service;
 
+import br.com.cactus.guard.audit.service.DataAccessService;
+
 import br.com.cactus.guard.common.exception.BusinessException;
 import br.com.cactus.guard.party.entity.Party;
 import br.com.cactus.guard.party.entity.PartyRelationship;

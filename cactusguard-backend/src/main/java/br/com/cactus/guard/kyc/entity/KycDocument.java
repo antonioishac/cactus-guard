@@ -32,12 +32,19 @@ public class KycDocument {
     @Column(name = "file_path", length = 500)
     private String filePath;
 
-    @Lob
-    @Column(name = "content")
+    // BYTEA no PostgreSQL (V21). Sem @Lob: no PostgreSQL o Hibernate mapearia @Lob byte[] para OID.
+    @Column(name = "content", columnDefinition = "bytea")
     private byte[] content;
 
     @Column(name = "content_type", length = 100)
     private String contentType;
+
+    /** SHA-256 (hex) do conteudo - prova de integridade da evidencia documental (V21). */
+    @Column(name = "sha256", length = 64)
+    private String sha256;
+
+    @Column(name = "size_bytes")
+    private Long sizeBytes;
 
     @Column(length = 20)
     private String status = "PENDING";

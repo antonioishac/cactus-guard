@@ -1,10 +1,10 @@
 package br.com.cactus.guard.party;
 
 import br.com.cactus.guard.party.dto.PartyRequest;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -38,7 +38,8 @@ class PartyIntegrationTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.document").value("12345678901"))
+                // documento sai mascarado na resposta (LGPD) - so os 4 ultimos digitos
+                .andExpect(jsonPath("$.document").value("*******8901"))
                 .andExpect(jsonPath("$.name").value("João Silva"))
                 .andExpect(jsonPath("$.status").value("ACTIVE"));
     }
@@ -59,6 +60,7 @@ class PartyIntegrationTest {
         mockMvc.perform(post("/api/v1/parties")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isBadRequest());
+                // BusinessException -> 422 (padrao do GlobalExceptionHandler)
+                .andExpect(status().isUnprocessableEntity());
     }
 }

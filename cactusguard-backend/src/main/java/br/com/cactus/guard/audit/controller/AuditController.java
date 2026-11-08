@@ -1,5 +1,6 @@
 package br.com.cactus.guard.audit.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import br.com.cactus.guard.audit.entity.AuditLog;
 import br.com.cactus.guard.audit.service.AuditService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ public class AuditController {
     private final AuditService auditService;
 
     @GetMapping("/entity/{entityType}/{entityId}")
+    @PreAuthorize("hasAnyRole('AUDITOR','ADMIN','SUPERVISOR')")
     public ResponseEntity<Page<AuditLog>> findByEntity(
             @PathVariable String entityType,
             @PathVariable UUID entityId,

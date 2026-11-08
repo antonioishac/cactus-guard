@@ -18,8 +18,9 @@ public class RefreshToken {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, unique = true, length = 512)
-    private String token;
+    /** SHA-256 (hex) do refresh token; o valor em claro nunca e persistido (V29). */
+    @Column(name = "token_hash", nullable = false, unique = true, length = 512)
+    private String tokenHash;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)

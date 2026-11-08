@@ -1,5 +1,6 @@
 package br.com.cactus.guard.common.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import br.com.cactus.guard.alert.repository.AlertRepository;
 import br.com.cactus.guard.case_.repository.CaseRepository;
 import br.com.cactus.guard.party.repository.PartyRepository;
@@ -31,6 +32,7 @@ public class HealthController {
     }
 
     @GetMapping("/stats")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<Map<String, Object>> stats() {
         return ResponseEntity.ok(Map.of(
                 "parties", partyRepository.count(),

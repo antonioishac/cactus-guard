@@ -45,6 +45,7 @@ class TransactionFieldsMappingTest {
                 .type("PIX")
                 .amount(BigDecimal.valueOf(1000))
                 .currency("BRL")
+                .status("COMPLETED")
                 .originCountry("BR")
                 .destinationCountry("US")
                 .purpose("Pagamento de serviço")

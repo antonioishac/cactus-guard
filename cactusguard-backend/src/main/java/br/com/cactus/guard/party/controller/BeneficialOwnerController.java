@@ -19,7 +19,7 @@ public class BeneficialOwnerController {
     private final BeneficialOwnerService service;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST')")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR')")
     public ResponseEntity<BeneficialOwner> add(
             @PathVariable UUID partyId,
             @RequestParam String document,
@@ -31,13 +31,13 @@ public class BeneficialOwnerController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST', 'SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<List<BeneficialOwner>> list(@PathVariable UUID partyId) {
         return ResponseEntity.ok(service.findByParty(partyId));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ResponseEntity<Void> remove(@PathVariable UUID id) {
         service.remove(id);
         return ResponseEntity.noContent().build();

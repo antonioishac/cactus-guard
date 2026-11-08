@@ -7,7 +7,7 @@ import br.com.cactus.guard.party.repository.PartyRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
@@ -66,7 +66,8 @@ class AlertIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "ANALYST")
+    // assume() vincula o alerta ao usuario logado, que precisa existir (admin e criado pelo DataInitializer)
+    @WithMockUser(username = "admin", roles = "ANALYST")
     void assumeAlertShouldChangeStatus() throws Exception {
         mockMvc.perform(post("/api/v1/alerts/" + testAlert.getId() + "/assume"))
                 .andExpect(status().isOk())

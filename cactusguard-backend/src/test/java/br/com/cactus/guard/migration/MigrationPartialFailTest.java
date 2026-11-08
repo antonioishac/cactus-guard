@@ -1,5 +1,6 @@
 package br.com.cactus.guard.migration;
 
+import br.com.cactus.guard.common.util.DocumentHash;
 import br.com.cactus.guard.migration.service.MigrationService;
 import br.com.cactus.guard.party.repository.PartyRepository;
 import org.junit.jupiter.api.Test;
@@ -32,7 +33,7 @@ class MigrationPartialFailTest {
 
         migrationService.processBatch(batch.getId());
 
-        var updated = partyRepository.findByDocument("55555555555");
+        var updated = partyRepository.findByDocumentHash(DocumentHash.of("55555555555"));
         assertTrue(updated.isPresent());
     }
 }

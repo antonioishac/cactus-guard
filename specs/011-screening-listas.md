@@ -25,3 +25,9 @@
 ## Contraparte
 - Transações devem poder ser filtradas contra listas de sanções e PEPs da contraparte.
 - Em caso de hit, a operação pode ser bloqueada, alertada ou escalada conforme política do tenant.
+
+## CSNU — Indisponibilidade de Ativos (Lei 13.810/2019, Res. BCB 44/2020)
+- Hit confirmado em sanção do CSNU **não** segue a política configurável do tenant: bloqueio (indisponibilidade) imediato e obrigatório, sem aviso prévio ao cliente.
+- Atualização da lista CSNU dispara rescreening de toda a base ativa (clientes, UBOs, representantes, contrapartes).
+- Desambiguação de homônimos usa nome da mãe, data de nascimento, nacionalidade e documento (ver 046).
+- Requisitos de comunicação e prova de tempestividade: ver 003.

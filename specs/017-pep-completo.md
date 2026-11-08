@@ -24,7 +24,8 @@ Obrigatório identificar:
 ## Regras Obrigatórias
 - Status PEP ativo por 5 anos após deixar o cargo.
 - Identificação na entrada e rechecagem periódica.
-- EDD obrigatória: aprovação da alta administração para estabelecer ou manter relacionamento (Art. 34).
+- EDD obrigatória: aprovação da alta administração para estabelecer ou manter relacionamento (Circular 3.978 — **[validar jurídico: número do artigo]**). Registrar aprovador, data e justificativa (ver 046).
+- Expiração: `pep_expiry_date` = data de saída do cargo + 5 anos; após expirar, o status muda para `expired` com alerta, sem apagar o histórico.
 - Diligência reforçada contínua.
 - Monitoramento específico (cenários da Carta 4.001 relacionados a PEPs).
 - Screening de familiares e colaboradores.

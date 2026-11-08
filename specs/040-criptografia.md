@@ -47,7 +47,7 @@ private String document;
 ## Backup
 
 - Backups criptografados com chave separada.
-- Retenção conforme política de PLD (mínimo 5 anos).
+- Retenção conforme política de PLD: **10 anos** (Circular BCB 3.978/2020, art. 67 — mais conservador que os 5 anos do art. 10, §2º, da Lei 9.613/1998). Ver spec 003.
 
 ## Observações para manutenção
 

@@ -19,7 +19,7 @@ public class DataAccessController {
     private final DataAccessService service;
 
     @GetMapping("/entity/{entityType}/{entityId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('AUDITOR','ADMIN','SUPERVISOR')")
     public ResponseEntity<Page<DataAccessLog>> byEntity(
             @PathVariable String entityType,
             @PathVariable UUID entityId,
@@ -28,7 +28,7 @@ public class DataAccessController {
     }
 
     @GetMapping("/user/{userId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('AUDITOR','ADMIN','SUPERVISOR')")
     public ResponseEntity<Page<DataAccessLog>> byUser(@PathVariable UUID userId, Pageable pageable) {
         return ResponseEntity.ok(service.findByUser(userId, pageable));
     }

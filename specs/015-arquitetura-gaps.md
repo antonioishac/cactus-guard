@@ -5,7 +5,7 @@
 | Decisão | Escolha Recomendada | Justificativa |
 |---------|---------------------|---------------|
 | Banco principal | PostgreSQL + JSONB | Flexibilidade + RLS nativo para multi-tenancy |
-| Multi-tenancy | Shared DB + `tenant_id` + RLS | Simples para SaaS, escalável, auditável |
+| Multi-tenancy | Shared DB + `tenant_id` + filtro Hibernate (047) + RLS como defesa em profundidade | Simples para SaaS, escalável, auditável |
 | Motor de regras (MVP) | JSON conditions + evaluator em código | Rápido de implementar e versionar; migrar para Drools depois se necessário |
 | Ingestão | Batch primeiro (CSV/JSON) | Menor complexidade; eventos depois |
 | Autenticação | JWT + RBAC simples | Suficiente para MVP |
@@ -13,7 +13,7 @@
 
 ## Observação sobre o Escopo do MVP
 
-O MVP foi redefinido como **completo** (ver `014-mvp-escopo-concreto.md`). Os itens abaixo não são mais considerados gaps do MVP, mas evoluções futuras de diferenciação.
+O MVP foi redefinido como **completo** (ver `014-mvp-escopo-completo.md`). Os itens abaixo não são mais considerados gaps do MVP, mas evoluções futuras de diferenciação.
 
 ## Evoluções Pós-MVP (Diferenciação)
 

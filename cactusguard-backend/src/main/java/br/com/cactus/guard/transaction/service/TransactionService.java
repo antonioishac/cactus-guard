@@ -1,5 +1,7 @@
 package br.com.cactus.guard.transaction.service;
 
+import br.com.cactus.guard.transaction.repository.TransactionRepository;
+
 import br.com.cactus.guard.party.entity.Party;
 import br.com.cactus.guard.party.repository.PartyRepository;
 import br.com.cactus.guard.transaction.dto.TransactionRequest;
@@ -20,6 +22,7 @@ public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final PartyRepository partyRepository;
+    private final DataAccessService dataAccessService;
 
     @Transactional
     public TransactionResponse create(TransactionRequest request) {

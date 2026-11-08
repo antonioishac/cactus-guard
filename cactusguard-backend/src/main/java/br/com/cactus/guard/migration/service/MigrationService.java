@@ -30,6 +30,9 @@ public class MigrationService {
         MigrationBatch batch = MigrationBatch.builder()
                 .sourceSystem(sourceSystem)
                 .status("PENDING")
+                .totalRecords(0)
+                .processedRecords(0)
+                .failedRecords(0)
                 .build();
         return batchRepository.save(batch);
     }
@@ -110,12 +113,6 @@ public class MigrationService {
     }
 
     private String hashDocument(String document) {
-        try {
-            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(document.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("Hash calculation failed", e);
-        }
+        return br.com.cactus.guard.common.util.DocumentHash.of(document);
     }
 }

@@ -1,5 +1,6 @@
 package br.com.cactus.guard.screening.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import br.com.cactus.guard.screening.dto.ScreeningResultResponse;
 import br.com.cactus.guard.screening.service.ScreeningService;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ public class ScreeningController {
     private final ScreeningService screeningService;
 
     @PostMapping("/screen/{partyId}")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR')")
     public ResponseEntity<ScreeningResultResponse> screen(
             @PathVariable UUID partyId,
             @RequestParam(defaultValue = "PEP,SANCTIONS") List<String> lists) {
@@ -26,6 +28,7 @@ public class ScreeningController {
     }
 
     @PostMapping("/screen-async/{partyId}")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR')")
     public ResponseEntity<String> screenAsync(
             @PathVariable UUID partyId,
             @RequestParam(defaultValue = "PEP,SANCTIONS") List<String> lists) {
@@ -34,11 +37,13 @@ public class ScreeningController {
     }
 
     @GetMapping("/party/{partyId}")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<List<ScreeningResultResponse>> findByParty(@PathVariable UUID partyId) {
         return ResponseEntity.ok(screeningService.findByParty(partyId));
     }
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<Page<ScreeningResultResponse>> findByStatus(
             @RequestParam(defaultValue = "PENDING") String status,
             Pageable pageable) {
@@ -46,6 +51,7 @@ public class ScreeningController {
     }
 
     @PostMapping("/{id}/review")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR')")
     public ResponseEntity<ScreeningResultResponse> review(
             @PathVariable UUID id,
             @RequestParam String status) {

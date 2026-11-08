@@ -9,5 +9,7 @@ import java.util.UUID;
 public interface CaseRepository extends JpaRepository<Case, UUID> {
     Page<Case> findByStatus(String status, Pageable pageable);
     Page<Case> findByAssignedToId(UUID assignedToId, Pageable pageable);
+    Page<Case> findByAssignedToIsNull(Pageable pageable);
     long countByStatus(String status);
+    long countByDecidedAtIsNull();
 }

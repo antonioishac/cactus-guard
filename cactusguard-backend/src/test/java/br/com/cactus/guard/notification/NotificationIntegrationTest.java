@@ -4,6 +4,7 @@ import br.com.cactus.guard.auth.entity.User;
 import br.com.cactus.guard.auth.repository.UserRepository;
 import br.com.cactus.guard.notification.service.NotificationService;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -23,6 +24,7 @@ class NotificationIntegrationTest {
     private UserRepository userRepository;
 
     @Test
+    @WithMockUser(username = "admin") // "minhas notificacoes" depende do usuario logado
     void createAndCountNotifications() {
         User user = userRepository.findByUsername("admin").orElse(null);
         if (user == null) return;

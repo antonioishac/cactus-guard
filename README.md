@@ -18,11 +18,11 @@ O CactusGuard é uma plataforma completa de compliance PLD que oferece:
 ### Backend
 | Tecnologia | Versão |
 |------------|--------|
-| Java | 21+ |
-| Spring Boot | 3.3+ |
+| Java | 25 |
+| Spring Boot | 4.x |
 | PostgreSQL | 15+ |
 | Redis | 7+ |
-| Kafka | 3.x |
+| Kafka | 3.x (planejado — ver `specs/README.md`) |
 
 ### Frontend
 | Tecnologia | Versão |
@@ -42,8 +42,8 @@ cactus-guard/
 │   └── src/main/resources/
 ├── cactusguard-web/         # Frontend React
 │   └── src/
-├── specs/                   # Especificações do backend (001-042)
-├── specs-frontend/          # Especificações do frontend (043+)
+├── specs/                   # Especificações (índice e status: specs/README.md)
+├── specs-frontend/          # Especificações de design do frontend (043-045)
 └── CLAUDE.md                # Instruções para Claude Code
 ```
 
@@ -66,7 +66,7 @@ cactus-guard/
 ### Backend
 ```bash
 cd cactusguard-backend
-./mvnw spring-boot:run
+JAVA_HOME=/c/Java/jdk-25.0.2 mvn spring-boot:run   # ajuste JAVA_HOME para seu JDK 25
 ```
 
 ### Frontend

@@ -16,7 +16,7 @@ public class MockScreeningProvider implements ScreeningProviderPort {
 
     @Override
     public ScreeningResult screen(Party party, List<String> listCodes) {
-        log.info("Mock screening for party: {}", party.getDocument());
+        log.info("Mock screening for party: {}", br.com.cactus.guard.common.util.DataMasker.maskDocument(party.getDocument()));
         return ScreeningResult.builder()
                 .party(party)
                 .listCode(listCodes.isEmpty() ? "PEP_BR" : listCodes.get(0))

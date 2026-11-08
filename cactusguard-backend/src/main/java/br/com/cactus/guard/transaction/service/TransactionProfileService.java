@@ -31,7 +31,7 @@ public class TransactionProfileService {
     public TransactionProfile calculate(UUID partyId) {
         Party party = partyRepository.findById(partyId).orElseThrow();
         Instant since = Instant.now().minus(90, ChronoUnit.DAYS);
-        List<Transaction> txns = transactionRepository.findByPartyIdAndOccurredAtAfter(partyId, since);
+        List<Transaction> txns = transactionRepository.findByPartyIdAndTransactionDateAfter(partyId, since);
 
         if (txns.isEmpty()) {
             return profileRepository.findByPartyId(partyId).orElse(null);

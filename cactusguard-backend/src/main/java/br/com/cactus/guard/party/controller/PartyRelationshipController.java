@@ -19,7 +19,7 @@ public class PartyRelationshipController {
     private final PartyRelationshipService service;
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ANALYST', 'SUPERVISOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR')")
     public ResponseEntity<PartyRelationship> add(@PathVariable UUID partyId, @RequestBody Map<String, Object> body) {
         PartyRelationship rel = service.add(
                 partyId,
@@ -31,13 +31,13 @@ public class PartyRelationshipController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ANALYST', 'SUPERVISOR', 'ADMIN')")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<List<PartyRelationship>> list(@PathVariable UUID partyId) {
         return ResponseEntity.ok(service.findByParty(partyId));
     }
 
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPERVISOR', 'ADMIN')")
+    @PreAuthorize("hasRole('SUPERVISOR')")
     public ResponseEntity<Void> deactivate(@PathVariable UUID id) {
         service.deactivate(id);
         return ResponseEntity.noContent().build();

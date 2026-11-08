@@ -35,7 +35,8 @@ class KycDocumentTest {
         party = partyRepository.save(party);
 
         var process = kycService.startOnboarding(party.getId());
-        var doc = documentService.addDocument(process.getId(), "RG", "rg.pdf", "/uploads/rg.pdf");
+        var doc = documentService.addDocument(process.getId(), "RG", "rg.pdf",
+                "%PDF-1.4 conteudo de teste".getBytes(java.nio.charset.StandardCharsets.UTF_8), "application/pdf");
 
         assertEquals("PENDING", doc.getStatus());
 

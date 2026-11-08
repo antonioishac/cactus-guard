@@ -1,5 +1,9 @@
 package br.com.cactus.guard.rule.service;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
+
 import br.com.cactus.guard.rule.dto.MonitoringRuleResponse;
 import br.com.cactus.guard.rule.entity.MonitoringRule;
 import br.com.cactus.guard.rule.repository.MonitoringRuleRepository;
@@ -18,17 +22,21 @@ public class MonitoringRuleService {
     @Transactional(readOnly = true)
     @Cacheable(value = "rules", key = "'active'")
     public List<MonitoringRuleResponse> findAllActive() {
+        // ArrayList (nao Stream#toList): a lista imutavel do JDK e final e sai sem type id no
+        // JSON polimorfico do cache Redis, o que impede a desserializacao
         return ruleRepository.findByActiveTrue().stream()
                 .map(this::toResponse)
-                .toList();
+                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
     }
 
     @Transactional(readOnly = true)
     @Cacheable(value = "rules", key = "'category:' + #category")
     public List<MonitoringRuleResponse> findByCategory(String category) {
+        // ArrayList (nao Stream#toList): a lista imutavel do JDK e final e sai sem type id no
+        // JSON polimorfico do cache Redis, o que impede a desserializacao
         return ruleRepository.findByCategoryAndActiveTrue(category).stream()
                 .map(this::toResponse)
-                .toList();
+                .collect(java.util.stream.Collectors.toCollection(java.util.ArrayList::new));
     }
 
     @Transactional

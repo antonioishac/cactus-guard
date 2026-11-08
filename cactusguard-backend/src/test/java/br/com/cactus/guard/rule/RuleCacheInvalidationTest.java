@@ -30,19 +30,20 @@ class RuleCacheInvalidationTest {
         assertFalse(rules.isEmpty());
 
         String code = rules.get(0).getCode();
-        boolean originalActive = rules.get(0).isActive();
+        assertTrue(rules.get(0).isActive());
 
-        ruleService.toggleActive(code, !originalActive);
+        try {
+            ruleService.toggleActive(code, false);
 
-        var updated = ruleService.findAllActive();
-        boolean newActive = updated.stream()
-                .filter(r -> r.getCode().equals(code))
-                .findFirst()
-                .map(r -> r.isActive())
-                .orElse(originalActive);
+            // findAllActive e @Cacheable: se o toggle nao invalidasse o cache, a regra desativada
+            // continuaria aparecendo na lista de ativas
+            var updated = ruleService.findAllActive();
+            assertTrue(updated.stream().noneMatch(r -> r.getCode().equals(code)),
+                    "Regra desativada ainda aparece em findAllActive (cache nao invalidado)");
+        } finally {
+            ruleService.toggleActive(code, true);
+        }
 
-        assertNotEquals(originalActive, newActive);
-
-        ruleService.toggleActive(code, originalActive);
+        assertTrue(ruleService.findAllActive().stream().anyMatch(r -> r.getCode().equals(code)));
     }
 }

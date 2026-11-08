@@ -3,7 +3,7 @@ package br.com.cactus.guard.risk.service;
 import br.com.cactus.guard.risk.entity.RiskHistory;
 import br.com.cactus.guard.risk.repository.RiskHistoryRepository;
 import br.com.cactus.guard.party.entity.Party;
-import br.com.cactus.guard.user.entity.User;
+import br.com.cactus.guard.auth.entity.User;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

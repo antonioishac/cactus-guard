@@ -1,5 +1,8 @@
 package br.com.cactus.guard.party.service;
 
+import br.com.cactus.guard.audit.service.DataAccessService;
+import java.util.UUID;
+
 import br.com.cactus.guard.party.dto.PartyRequest;
 import br.com.cactus.guard.party.dto.PartyResponse;
 import br.com.cactus.guard.party.entity.Party;
@@ -44,13 +47,20 @@ public class PartyService {
     }
 
     private String hashDocument(String document) {
-        try {
-            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(document.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            return java.util.HexFormat.of().formatHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("Hash calculation failed", e);
-        }
+        return br.com.cactus.guard.common.util.DocumentHash.of(document);
+    }
+
+    /**
+     * Busca por CPF/CNPJ via {@code document_hash} (o documento é criptografado com IV aleatório
+     * e não suporta comparação por igualdade).
+     */
+    @Transactional(readOnly = true)
+    public java.util.Optional<PartyResponse> findByDocument(String document) {
+        return partyRepository.findByDocumentHash(hashDocument(document))
+                .map(party -> {
+                    dataAccessService.log("PARTY", party.getId(), "document", "CONSULTA", null);
+                    return toResponse(party);
+                });
     }
 
     @Transactional(readOnly = true)

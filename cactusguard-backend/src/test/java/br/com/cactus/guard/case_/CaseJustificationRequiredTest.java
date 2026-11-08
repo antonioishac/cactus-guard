@@ -59,6 +59,6 @@ class CaseJustificationRequiredTest {
 
         var decided = caseService.decide(caseResp.getId(), decision);
         assertEquals("APPROVED", decided.getStatus());
-        assertEquals("Justificativa detalhada da análise", decided.getJustification());
+        assertEquals("Justificativa detalhada da análise", decided.getDecisionJustification());
     }
 }

@@ -30,6 +30,11 @@ public class ScreeningList {
     @Column(length = 100)
     private String source;
 
+    /** Match exige indisponibilidade imediata de ativos (Lei 13.810/2019, Res. BCB 44/2020) (V28). */
+    @Column(name = "requires_asset_freeze", nullable = false)
+    @Builder.Default
+    private boolean requiresAssetFreeze = false;
+
     @Column(nullable = false)
     private boolean active = true;
 

@@ -21,7 +21,7 @@ public class KycDocumentDownloadController {
     private final KycDocumentRepository repository;
 
     @GetMapping("/{id}/download")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST', 'SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<ByteArrayResource> download(@PathVariable UUID id) {
         KycDocument doc = repository.findById(id)
                 .orElseThrow(() -> new BusinessException("Documento não encontrado"));

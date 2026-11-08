@@ -19,5 +19,14 @@ public class CaseResponse {
     private String decisionJustification;
     private Instant decidedAt;
     private Instant slaDueDate;
+    private Instant occurredAt;
+    private Instant selectedAt;
+    private Instant analysisDeadline;
+    private Instant communicationDeadline;
+    private int escalationLevel;
+    private boolean edd;
+    private UUID approvedById;
+    private Instant approvedAt;
+    private Instant closedAt;
     private Instant createdAt;
 }

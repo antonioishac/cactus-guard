@@ -1,5 +1,6 @@
 package br.com.cactus.guard.migration;
 
+import br.com.cactus.guard.common.util.DocumentHash;
 import br.com.cactus.guard.migration.service.MigrationService;
 import br.com.cactus.guard.party.repository.PartyRepository;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ class MigrationWithRiskTest {
 
         migrationService.processBatch(batch.getId());
 
-        var party = partyRepository.findByDocument("40404040404");
+        var party = partyRepository.findByDocumentHash(DocumentHash.of("40404040404"));
         assertTrue(party.isPresent());
         assertEquals("PENDING", party.get().getRiskLevel());
     }

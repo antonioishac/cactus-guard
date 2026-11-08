@@ -22,7 +22,7 @@ public class DashboardController {
     private final KycProcessRepository kycRepository;
 
     @GetMapping("/operational")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPERVISOR', 'ANALYST')")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<Map<String, Object>> operational() {
         long openAlerts = alertRepository.countByStatus("OPEN");
         long openCases = caseRepository.countByStatus("OPEN");

@@ -24,7 +24,7 @@ public class RateLimitConfig {
 
     private Bucket createBucket(int capacity, Duration duration) {
         return Bucket.builder()
-                .addLimit(Bandwidth.simple(capacity, duration))
+                .addLimit(Bandwidth.builder().capacity(capacity).refillGreedy(capacity, duration).build())
                 .build();
     }
 }

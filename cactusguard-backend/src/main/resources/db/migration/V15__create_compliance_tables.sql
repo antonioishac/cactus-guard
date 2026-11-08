@@ -31,6 +31,12 @@ CREATE TABLE risk_history (
 CREATE INDEX idx_risk_history_party ON risk_history(party_id);
 
 -- Transaction Profile (baseline)
+-- V8 criou uma transaction_profiles com colunas diferentes (expected_monthly_volume,
+-- expected_transaction_count, risk_score, last_calculated) que nunca foi usada por
+-- nenhuma entity. A entity TransactionProfile usa o layout abaixo, portanto a tabela
+-- antiga e descartada antes da recriacao (sem isso o Flyway falha em banco limpo).
+DROP TABLE IF EXISTS transaction_profiles;
+
 CREATE TABLE transaction_profiles (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     party_id            UUID NOT NULL REFERENCES parties(id) UNIQUE,

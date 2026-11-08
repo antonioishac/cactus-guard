@@ -19,7 +19,7 @@ public class RiskHistoryController {
     private final RiskHistoryService service;
 
     @GetMapping("/party/{partyId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST', 'SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<Page<RiskHistory>> findByParty(@PathVariable UUID partyId, Pageable pageable) {
         return ResponseEntity.ok(service.findByParty(partyId, pageable));
     }

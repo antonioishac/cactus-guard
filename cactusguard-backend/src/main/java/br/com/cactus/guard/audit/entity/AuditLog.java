@@ -46,6 +46,14 @@ public class AuditLog {
     @Column(name = "ip_address", length = 45)
     private String ipAddress;
 
+    /** Hash do registro anterior na cadeia de integridade (V22). Opcional. */
+    @Column(name = "prev_hash", length = 64)
+    private String prevHash;
+
+    /** SHA-256(prev_hash + conteudo canonico deste registro) (V22). Opcional. */
+    @Column(name = "hash", length = 64)
+    private String hash;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

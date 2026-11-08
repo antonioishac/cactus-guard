@@ -1,11 +1,13 @@
-# Spec 07 — Padrões técnicos e arquitetura do backend (CactusGuard)
+# 047 — Padrões técnicos e arquitetura do backend (CactusGuard)
+
+> Renumerada de `007-padroes-tecnicos-backend.md` (havia dois arquivos 007). Status de implementação de cada decisão: ver `README.md` → "Status de implementação vs specs".
 
 Complementa a visão geral do projeto. Define como o código Java do **CactusGuard** é organizado, quais padrões usar e quando.
 
 ## Versões e linguagem
 
 - **Java 25+** com uso deliberado de recursos modernos: `records` para DTOs imutáveis, `Optional` em buscas, streams/lambdas com critério, virtual threads habilitadas para I/O-bound (screening, chamadas externas, consultas concorrentes), pattern matching e sealed classes onde modelam bem conjuntos fechados de estados (ex.: resultado de screening, status de alerta, decisão de case).
-- **Spring Boot 4.1.2+** como framework, alinhado ao Java 25+ (suporte nativo a virtual threads).
+- **Spring Boot 4.x** (versão estável mais recente; mínimo 4.1.2) como framework, alinhado ao Java 25+ (suporte nativo a virtual threads).
 
 ## Arquitetura: monolito modular + hexagonal seletivo
 
@@ -65,7 +67,7 @@ O módulo compartilhado (`common`) também vive sob `br.com.cactus.guard.common`
 - **Strategy**: para variações de regras de monitoramento, classificação de risco e validações de screening.
 - **Circuit breaker**: **Resilience4j** em toda chamada a serviço externo (provedores de listas, SISCOAF, APIs de dados).
 - **Eventos de domínio**: mudanças relevantes publicadas como eventos.  
-  **Kafka é adotado desde o MVP** (não apenas Spring ApplicationEvent).  
+  **Kafka é a decisão de arquitetura** (não apenas Spring ApplicationEvent). Status: **pendente** — o código atual não publica eventos em Kafka.  
   Requisitos obrigatórios:
   - DLQ em todo consumer.
   - Retentativas com backoff.
@@ -102,7 +104,8 @@ Para buscas textuais (nome, documento, descrição de alerta, justificativa etc.
 - **Integração futura com Azure AD**: arquitetura preparada para trocar o provedor OIDC sem impacto no restante do sistema (configuração por tenant ou por ambiente).
 - **Multi-tenancy**: claim `tenant_id` no JWT.  
   Schema único + coluna `tenant_id` obrigatória e indexada + filtro automático via Hibernate `@Filter`/`@FilterDef` habilitado por request.  
-  Proibido espalhar `WHERE tenant_id = ?` manualmente nos repositories.
+  Proibido espalhar `WHERE tenant_id = ?` manualmente nos repositories.  
+  Status: **pendente** — entidades atuais não têm `tenant_id` nem filtro; ver `README.md`. A spec 015 cita RLS do PostgreSQL como camada adicional (defesa em profundidade) sobre o filtro Hibernate.
 
 ## Tratamento de erros e logging
 

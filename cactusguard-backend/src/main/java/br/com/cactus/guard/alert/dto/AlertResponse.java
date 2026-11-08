@@ -2,6 +2,7 @@ package br.com.cactus.guard.alert.dto;
 
 import lombok.Builder;
 import lombok.Data;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -19,5 +20,10 @@ public class AlertResponse {
     private String ruleCode;
     private UUID assignedToId;
     private Instant dueDate;
+    private Instant occurredAt;
+    private Instant selectionDeadline;
+    private Integer ruleVersion;
+    private BigDecimal totalAmount;
+    private String falsePositiveReason;
     private Instant createdAt;
 }

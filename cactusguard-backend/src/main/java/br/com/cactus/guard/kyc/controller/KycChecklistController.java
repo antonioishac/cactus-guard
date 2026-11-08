@@ -1,5 +1,6 @@
 package br.com.cactus.guard.kyc.controller;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import br.com.cactus.guard.kyc.dto.KycChecklistResponse;
 import br.com.cactus.guard.kyc.service.KycChecklistService;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ public class KycChecklistController {
     private final KycChecklistService checklistService;
 
     @PostMapping("/{processId}")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR')")
     public ResponseEntity<KycChecklistResponse> add(
             @PathVariable UUID processId,
             @RequestParam String itemCode,
@@ -28,11 +30,13 @@ public class KycChecklistController {
     }
 
     @GetMapping("/process/{processId}")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<List<KycChecklistResponse>> findByProcess(@PathVariable UUID processId) {
         return ResponseEntity.ok(checklistService.findByProcess(processId));
     }
 
     @PostMapping("/{id}/complete")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR')")
     public ResponseEntity<KycChecklistResponse> complete(@PathVariable UUID id) {
         return ResponseEntity.ok(checklistService.complete(id));
     }

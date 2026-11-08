@@ -97,13 +97,31 @@ Respostas de erro seguem o padrão global do backend.
 ```
 
 ### POST /api/v1/cases/{id}/decide
+Decisão final regulatória (specs 003, 008, 012). Escalar **não** é decisão.
 **Request**
 ```json
 {
-  "decision": "APPROVED | REJECTED | ESCALATED",
-  "justification": "string"
+  "decision": "COMMUNICATE | ARCHIVE",
+  "justification": "string (obrigatória, não vazia)"
 }
 ```
+- Case sem exigência de quatro olhos → `CLOSED`. Se `COMMUNICATE`, cria comunicação SISCOAF com prazo D+1 útil.
+- Case com PEP / alto risco / EDD → `PENDING_APPROVAL` (decisão proposta, aguarda aprovação).
+- **422**: justificativa ausente; case já encerrado (não reabre).
+
+### POST /api/v1/cases/{id}/escalate
+Transição de workflow para nível superior (não encerra o case).
+```json
+{ "reason": "string (obrigatória)", "targetRole": "SUPERVISOR | COMPLIANCE_OFFICER" }
+```
+
+### POST /api/v1/cases/{id}/approve
+Aprovação de nível superior (quatro olhos). Permissão `case:approve`.
+```json
+{ "approved": true, "justification": "string (obrigatória)" }
+```
+- **403** se o aprovador for o mesmo usuário que propôs a decisão.
+- `approved=false` → case volta a `IN_ANALYSIS` com a justificativa registrada.
 
 ---
 

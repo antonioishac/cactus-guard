@@ -1,52 +1,46 @@
-# CLAUDE.md — CactusGuard PLD/FT
+# CactusGuard — PLD/FT SaaS
 
-## Objetivo do Projeto
+Plataforma SaaS de Prevenção à Lavagem de Dinheiro e Financiamento do Terrorismo para instituições reguladas pelo BCB (bancos, IPs, fintechs). Pacote `br.com.cactus.guard`.
 
-Plataforma SaaS de **Prevenção à Lavagem de Dinheiro e Financiamento do Terrorismo (PLD/FT)** para o mercado brasileiro.
+## Stack e comandos
+- Backend `cactusguard-backend/`: Java 25, Spring Boot 4.x, PostgreSQL, Redis, Flyway, Resilience4j, JWT. Detalhes: `cactusguard-backend/CLAUDE.md`.
+  - Testes: `cd cactusguard-backend && JAVA_HOME=/c/Java/jdk-25.0.2 mvn test`
+  - Um teste: `JAVA_HOME=/c/Java/jdk-25.0.2 mvn test -Dtest=NomeDoTest`
+- Web `cactusguard-web/`: React 18 + Vite + Tailwind + Zustand. `npm run dev` | `npm run build` (inclui `tsc`).
 
-**Nome**: CactusGuard  
-**Pacote**: `br.com.cactus.guard`
+## Invariantes regulatórias (nunca violar)
+- Decisão de case é humana: `COMMUNICATE` ou `ARCHIVE`, com justificativa obrigatória. Escalar não é decisão.
+- Quatro olhos em PEP / alto risco / EDD: aprovador ≠ quem decidiu.
+- Prazos: seleção ≤ 45 dias da ocorrência; análise ≤ 45 dias da seleção; comunicação COAF até D+1 útil da decisão.
+- Espécie ≥ R$ 50 mil (inclui provisionamento de saque): comunicação automática, sem análise.
+- Hit CSNU confirmado: bloqueio imediato (Lei 13.810).
+- Nunca dar ciência ao cliente (tipping-off): case/comunicação jamais expostos em canal do cliente.
+- AuditLog append-only; toda ação relevante audita. Retenção mínima 10 anos.
+- PII criptografada em repouso; busca só por hash; acesso a PII registrado (LGPD).
+- Na dúvida regulatória: interpretação mais conservadora + registrar na spec.
 
-## Status Atual (Backend)
+## Qual spec ler (índice completo: `specs/README.md`)
+| Tarefa | Spec |
+|---|---|
+| Prazos, COAF, retenção, CSNU | specs/003 |
+| Campos de entidade / migration nova | specs/046, specs/002 |
+| Regras e cenários | specs/008, 009, 013 |
+| Case, dossiê, aprovação | specs/012, 033 |
+| PEP / KYC / UBO | specs/017, 010 |
+| Screening | specs/011, 037 |
+| Padrões de código backend | specs/047, 007 |
+| Criptografia / LGPD | specs/040 |
+| Endpoints | specs/033 |
+| Frontend | `cactusguard-web/CLAUDE.md` |
 
-| Métrica | Valor |
-|---------|-------|
-| Controllers | 30 |
-| Services | 30 |
-| Entities | 29 |
-| Testes | 143 |
-| Migrations | 20 |
+O que ainda não está implementado: `specs/README.md` → "Status de implementação".
 
-## Módulos Implementados
+## Regras de trabalho
+- Não ler `target/`, `node_modules/`, `dist/`, `.idea/`, logs.
+- Ler a spec da tarefa, não a pasta inteira.
+- Após alterar código, rodar os testes do módulo afetado (ex.: `-Dtest='Case*Test'`); suíte completa antes de concluir.
+- Exit code: não confiar em `cmd | tail`; use `cmd; echo EXIT=$?` ou `set -o pipefail`.
+- Specs novas: próximo número livre em `specs/README.md`; atualizar o índice.
 
-- Auth + JWT + Roles
-- Party CRUD + Full Text + Criptografia + Mascaramento + Document Hash + Campos PLD
-- Beneficial Owner + Alerta PEP
-- Endereços + Relacionamentos
-- Risk History + Endpoint + Persistência automática
-- Watchlist + Motor + Seed
-- Transaction Profile + Endpoint + Campos de rastreabilidade
-- Data Access Log (LGPD)
-- Alertas + Cases (justificativa + SLA + impede reabertura)
-- Motor de regras (7 tipos: PEP, Sanção, High Value, Velocity, Structuring, Unusual Pattern, Watchlist)
-- Screening + Orchestrator + Async + Circuit Breaker
-- SISCOAF + SAR + Orchestrator + Circuit Breaker
-- KYC + Checklist validation + Upload real + Download + Circuit Breaker
-- Relatórios PDF/Excel
-- Migração com hash
-- Audit + Data Retention Job
-- Dashboard operacional
-- Rate Limit + Métricas + Resilience4j
-- Endpoint recalcular risco
-
-## Stack
-
-- Java 21 + Spring Boot 3.3
-- PostgreSQL + Redis
-- Resilience4j (circuit breaker)
-- AES-256-GCM (criptografia)
-- JWT + Spring Security
-
-## Referências das Specs
-
-Consulte sempre a pasta `specs/` antes de implementar.
+## Agentes e skills do projeto
+Ver `.claude/README.md`.

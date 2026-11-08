@@ -47,7 +47,7 @@ Os cenários abaixo estão alinhados à Carta Circular BCB 4.001/2020 e devem se
 - Transações com valores redondos (ex.: múltiplos de 1.000 ou 10.000) ou ligeiramente abaixo de limiares de comunicação automática.
 
 ### 2.7 Espécie (Comunicação Automática)
-- Depósitos, saques ou ordens em espécie ≥ R$ 50.000,00 devem gerar comunicação automática ao COAF (não dependem de análise de suspeita).
+- Depósitos, aportes, saques e **pedidos de provisionamento de saque** em espécie ≥ R$ 50.000,00 devem gerar comunicação automática ao COAF (não dependem de análise de suspeita). Ver 003.
 
 ### 2.8 Outros cenários relevantes
 - Múltiplas contas do mesmo cliente com movimentação fragmentada.
@@ -75,7 +75,8 @@ Os cenários abaixo estão alinhados à Carta Circular BCB 4.001/2020 e devem se
 ### Regras de decisão
 - A decisão final é sempre humana.
 - Toda decisão deve ter justificativa textual obrigatória.
-- É possível escalar o caso para nível superior.
+- É possível escalar o caso para nível superior — escalação é transição de workflow, não decisão final.
+- Casos com PEP, alto risco ou EDD exigem aprovação de nível superior por usuário distinto do analista (quatro olhos; ver 012).
 - Casos arquivados devem permanecer rastreáveis.
 
 ## 5. Screening
@@ -89,7 +90,7 @@ Os cenários abaixo estão alinhados à Carta Circular BCB 4.001/2020 e devem se
 
 ## 6. Beneficiário Final (UBO)
 
-- Para pessoas jurídicas, deve ser identificado o beneficiário final com participação ≥ 25% (direta ou indireta).
+- Para pessoas jurídicas, deve ser identificado o beneficiário final com participação ≥ 25% (direta ou indireta); a instituição pode adotar percentual menor (configurável por tenant).
 - Quando não for possível identificar, o cliente deve receber classificação de risco elevada e diligência reforçada.
 
 ## 7. Regras de Integridade e Auditoria

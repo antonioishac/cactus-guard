@@ -17,13 +17,13 @@ public class TransactionProfileController {
     private final TransactionProfileService service;
 
     @PostMapping("/calculate/{partyId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST')")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR')")
     public ResponseEntity<TransactionProfile> calculate(@PathVariable UUID partyId) {
         return ResponseEntity.ok(service.calculate(partyId));
     }
 
     @GetMapping("/party/{partyId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'ANALYST', 'SUPERVISOR')")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<TransactionProfile> findByParty(@PathVariable UUID partyId) {
         TransactionProfile profile = service.findByParty(partyId);
         return profile != null ? ResponseEntity.ok(profile) : ResponseEntity.notFound().build();

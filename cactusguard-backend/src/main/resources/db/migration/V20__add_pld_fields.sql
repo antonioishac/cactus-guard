@@ -1,4 +1,4 @@
--- V20: Add PLD fields to parties and transactions, create addresses and relationships
+-- V20: Add PLD fields to parties and transactions, adjust addresses and create relationships
 
 -- Party PLD fields
 ALTER TABLE parties ADD COLUMN IF NOT EXISTS birth_date DATE;
@@ -12,26 +12,18 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS purpose VARCHAR(200);
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS device_id VARCHAR(100);
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS ip_address VARCHAR(45);
 
--- Addresses table
-CREATE TABLE IF NOT EXISTS party_addresses (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    party_id UUID NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
-    type VARCHAR(20) NOT NULL,
-    street VARCHAR(200),
-    number VARCHAR(20),
-    complement VARCHAR(100),
-    neighborhood VARCHAR(100),
-    city VARCHAR(100),
-    state VARCHAR(50),
-    zip_code VARCHAR(10),
-    country VARCHAR(50) DEFAULT 'BR',
-    is_primary BOOLEAN DEFAULT false,
-    created_at TIMESTAMP DEFAULT NOW()
-);
+-- Addresses: a tabela party_addresses ja existe desde V2. A versao original desta
+-- migration usava CREATE TABLE IF NOT EXISTS, que era ignorado, e a coluna "type"
+-- (NOT NULL na entity PartyAddress) nunca era criada. Correcao via ALTER TABLE.
+ALTER TABLE party_addresses ADD COLUMN IF NOT EXISTS type VARCHAR(20) NOT NULL DEFAULT 'RESIDENTIAL';
+ALTER TABLE party_addresses ALTER COLUMN state TYPE VARCHAR(50);
+ALTER TABLE party_addresses ALTER COLUMN is_primary SET DEFAULT false;
 
-CREATE INDEX IF NOT EXISTS idx_party_addresses_party ON party_addresses(party_id);
+CREATE INDEX IF NOT EXISTS idx_party_addresses_type ON party_addresses(type);
 
 -- Relationships table
+-- created_at como TIMESTAMPTZ: a entity mapeia Instant (TIMESTAMP_WITH_TIMEZONE);
+-- TIMESTAMP sem fuso falha em ddl-auto=validate.
 CREATE TABLE IF NOT EXISTS party_relationships (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     party_id UUID NOT NULL REFERENCES parties(id) ON DELETE CASCADE,
@@ -39,7 +31,7 @@ CREATE TABLE IF NOT EXISTS party_relationships (
     relationship_type VARCHAR(50) NOT NULL,
     description VARCHAR(200),
     active BOOLEAN DEFAULT true,
-    created_at TIMESTAMP DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
     UNIQUE(party_id, related_party_id, relationship_type)
 );
 

@@ -5,7 +5,9 @@ import lombok.Data;
 
 @Data
 public class CaseDecisionRequest {
+    /** COMMUNICATE ou ARCHIVE (escalonamento tem endpoint proprio). */
     @NotBlank
-    private String decision; // APPROVED, REJECTED, ESCALATED
+    private String decision;
+    /** Obrigatoria (minimo de 20 caracteres nao brancos). */
     private String justification;
 }

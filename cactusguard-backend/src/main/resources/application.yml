@@ -1,6 +1,13 @@
 spring:
   application:
     name: cactusguard
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+  threads:
+    virtual:
+      enabled: true
   datasource:
     url: jdbc:postgresql://localhost:5432/cactusguard
     username: postgres
@@ -11,7 +18,6 @@ spring:
       ddl-auto: validate
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
     open-in-view: false
   flyway:
@@ -24,17 +30,66 @@ spring:
 
 server:
   port: 8080
+  error:
+    include-stacktrace: never
+    include-message: never
+    include-binding-errors: never
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        secure: true
 
 jwt:
-  secret: ${JWT_SECRET:cactusguard-mvp-secret-key-change-in-production-2026}
+  # Sem default: JWT_SECRET (>= 32 bytes / 256 bits) e obrigatorio fora dos perfis dev/test (fail-fast).
+  secret: ${JWT_SECRET:}
+  issuer: ${JWT_ISSUER:cactusguard}
   access-token-expiration: 1800000
   refresh-token-expiration: 604800000
+
+# Segredos de seguranca: sem defaults. Perfis dev/test trazem valores proprios (application-dev.yml).
+security:
+  crypto:
+    # "v1:<base64 32 bytes>[,v2:<base64 32 bytes>]" - rotacao a cada 90 dias (spec 040)
+    keys: ${ENCRYPTION_KEYS:}
+    active-version: ${ENCRYPTION_ACTIVE_VERSION:}
+    # valor bruto da antiga ENCRYPTION_KEY, para ler dados legados sem prefixo
+    legacy-key: ${ENCRYPTION_LEGACY_KEY:${ENCRYPTION_KEY:}}
+  document-hash:
+    key: ${DOCUMENT_HASH_KEY:}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+  hsts:
+    enabled: ${HSTS_ENABLED:true}
+  admin-bootstrap:
+    # senha inicial do admin (so criado se informada, ou nos perfis dev/test)
+    password: ${ADMIN_BOOTSTRAP_PASSWORD:}
+
+retention:
+  # Circular BCB 3.978/2020 art. 67: minimo de 10 anos (3653 dias). Valores menores sao rejeitados.
+  audit-days: ${RETENTION_AUDIT_DAYS:3653}
+
+reports:
+  output-dir: ${REPORTS_DIR:reports}
+
+kyc:
+  upload:
+    max-bytes: ${KYC_UPLOAD_MAX_BYTES:10485760}
+
+springdoc:
+  api-docs:
+    enabled: ${SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${SWAGGER_ENABLED:false}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,prometheus,metrics
+        include: health,prometheus
+  endpoint:
+    health:
+      show-details: never
   metrics:
     tags:
       application: cactusguard
@@ -84,4 +139,4 @@ integrations:
 logging:
   level:
     org.springframework.security: INFO
-    br.com.cactus.guard: DEBUG
+    br.com.cactus.guard: INFO

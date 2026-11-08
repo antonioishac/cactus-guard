@@ -4,47 +4,31 @@ import br.com.cactus.guard.case_.entity.Case;
 import br.com.cactus.guard.case_.repository.CaseRepository;
 import br.com.cactus.guard.common.exception.BusinessException;
 import br.com.cactus.guard.siscoaf.entity.SiscoafCommunication;
-import br.com.cactus.guard.siscoaf.repository.SiscoafCommunicationRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Map;
 import java.util.UUID;
 
+/**
+ * Legado: SAR equivale a COS. Gera (ou recupera) o rascunho de COS de um case cuja decisao
+ * COMMUNICATE ja foi aprovada. O payload referencia a parte por id, nunca por documento.
+ */
 @Service
 @RequiredArgsConstructor
 public class SarGeneratorService {
 
     private final CaseRepository caseRepository;
-    private final SiscoafCommunicationRepository siscoafRepository;
+    private final SiscoafDraftService draftService;
 
     @Transactional
     public SiscoafCommunication generateSar(UUID caseId) {
         Case c = caseRepository.findById(caseId)
                 .orElseThrow(() -> new BusinessException("Case não encontrado"));
 
-        if (!"REJECTED".equals(c.getStatus()) && !"ESCALATED".equals(c.getStatus())) {
-            throw new BusinessException("SAR só pode ser gerado para cases rejeitados ou escalados");
+        if (!"COMMUNICATE".equals(c.getStatus()) && !"COMMUNICATED".equals(c.getStatus())) {
+            throw new BusinessException("COS/SAR só pode ser gerada para case com decisão COMMUNICATE aprovada");
         }
-
-        Map<String, Object> payload = Map.of(
-                "caseId", c.getId().toString(),
-                "partyName", c.getParty() != null ? c.getParty().getName() : "",
-                "partyDocument", c.getParty() != null ? c.getParty().getDocument() : "",
-                "decision", c.getDecision() != null ? c.getDecision() : "",
-                "justification", c.getDecisionJustification() != null ? c.getDecisionJustification() : "",
-                "alertType", c.getAlert() != null ? c.getAlert().getType() : "",
-                "severity", c.getAlert() != null ? c.getAlert().getSeverity() : ""
-        );
-
-        SiscoafCommunication comm = SiscoafCommunication.builder()
-                .caseEntity(c)
-                .type("SAR")
-                .status("DRAFT")
-                .payload(payload)
-                .build();
-
-        return siscoafRepository.save(comm);
+        return draftService.createCosDraft(c, c.getApprovedAt(), c.getCommunicationDeadline());
     }
 }

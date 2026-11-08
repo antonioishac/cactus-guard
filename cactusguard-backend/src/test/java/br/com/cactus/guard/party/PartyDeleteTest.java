@@ -28,6 +28,6 @@ class PartyDeleteTest {
 
         partyService.delete(created.getId());
 
-        assertThrows(IllegalArgumentException.class, () -> partyService.findById(created.getId()));
+        assertThrows(br.com.cactus.guard.common.exception.BusinessException.class, () -> partyService.findById(created.getId()));
     }
 }

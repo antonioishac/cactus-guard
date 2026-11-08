@@ -25,6 +25,9 @@ public class ReportGenerationService {
     private final ReportJobRepository jobRepository;
     private final AlertRepository alertRepository;
 
+    @org.springframework.beans.factory.annotation.Value("${reports.output-dir:reports}")
+    private String outputDirName;
+
     @Async
     public void generateAsync(ReportJob job) {
         try {
@@ -32,7 +35,7 @@ public class ReportGenerationService {
             job.setStartedAt(Instant.now());
             jobRepository.save(job);
 
-            Path outputDir = Path.of("reports");
+            Path outputDir = Path.of(outputDirName);
             Files.createDirectories(outputDir);
             String fileName = job.getReportCode() + "_" + job.getId() + ".pdf";
             Path filePath = outputDir.resolve(fileName);
