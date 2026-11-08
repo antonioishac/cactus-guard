@@ -29,6 +29,12 @@ public class SiscoafDraftService {
         for (SiscoafCommunication e : existing) {
             if (!"CANCELLED".equals(e.getStatus()) && !"REJECTED".equals(e.getStatus())
                     && !"RECTIFIED".equals(e.getStatus())) {
+                // rascunho manual preexistente: passa a refletir a decisao aprovada e o prazo regulatorio
+                if (e.getDecidedAt() == null && "DRAFT".equals(e.getStatus())) {
+                    e.setDecidedAt(decidedAt);
+                    e.setDeadlineAt(deadline);
+                    return repository.save(e);
+                }
                 return e;
             }
         }

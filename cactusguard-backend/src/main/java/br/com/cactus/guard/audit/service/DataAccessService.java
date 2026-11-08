@@ -1,5 +1,7 @@
 package br.com.cactus.guard.audit.service;
 
+import br.com.cactus.guard.audit.dto.AuditFilter;
+import br.com.cactus.guard.audit.dto.DataAccessLogResponse;
 import br.com.cactus.guard.audit.entity.DataAccessLog;
 import br.com.cactus.guard.audit.repository.DataAccessLogRepository;
 import br.com.cactus.guard.auth.entity.User;
@@ -44,5 +46,24 @@ public class DataAccessService {
 
     public Page<DataAccessLog> findByUser(UUID userId, Pageable pageable) {
         return repository.findByUserIdOrderByCreatedAtDesc(userId, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<DataAccessLogResponse> searchResponses(AuditFilter f, Pageable pageable) {
+        org.springframework.data.jpa.domain.Specification<DataAccessLog> spec = (root, query, cb) -> {
+            java.util.List<jakarta.persistence.criteria.Predicate> ps = new java.util.ArrayList<>();
+            if (f.userId() != null) ps.add(cb.equal(root.get("user").get("id"), f.userId()));
+            if (f.username() != null && !f.username().isBlank()) {
+                ps.add(cb.equal(root.join("user", jakarta.persistence.criteria.JoinType.LEFT).get("username"), f.username().trim()));
+            }
+            if (f.entityType() != null && !f.entityType().isBlank()) ps.add(cb.equal(root.get("entityType"), f.entityType().trim()));
+            if (f.entityId() != null) ps.add(cb.equal(root.get("entityId"), f.entityId()));
+            if (f.from() != null) ps.add(cb.greaterThanOrEqualTo(root.get("createdAt"), f.from()));
+            if (f.to() != null) ps.add(cb.lessThanOrEqualTo(root.get("createdAt"), f.to()));
+            return cb.and(ps.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+        Pageable p = pageable.getSort().isSorted() ? pageable : org.springframework.data.domain.PageRequest.of(
+                pageable.getPageNumber(), pageable.getPageSize(), org.springframework.data.domain.Sort.by("createdAt").descending());
+        return repository.findAll(spec, p).map(DataAccessLogResponse::from);
     }
 }

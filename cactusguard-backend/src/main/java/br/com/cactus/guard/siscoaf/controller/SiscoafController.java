@@ -1,6 +1,10 @@
 package br.com.cactus.guard.siscoaf.controller;
 
+import br.com.cactus.guard.common.util.DateRange;
+import br.com.cactus.guard.siscoaf.dto.SiscoafApproveRequest;
 import br.com.cactus.guard.siscoaf.dto.SiscoafReasonRequest;
+import br.com.cactus.guard.siscoaf.dto.SiscoafSubmitRequest;
+import br.com.cactus.guard.siscoaf.repository.SiscoafSpecifications;
 import br.com.cactus.guard.siscoaf.dto.SiscoafResponse;
 import br.com.cactus.guard.siscoaf.service.NegativeDeclarationService;
 import br.com.cactus.guard.siscoaf.service.SiscoafService;
@@ -15,6 +19,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -38,11 +43,19 @@ public class SiscoafController {
                 .body(siscoafService.createDraft(caseId, type, payload));
     }
 
+    @PostMapping("/{id}/approve")
+    @PreAuthorize("hasRole('SUPERVISOR')")
+    @Operation(summary = "Aprova a comunicacao (SUPERVISOR; justificativa obrigatoria; quatro olhos quando PEP/alto risco/EDD). Nao envia ao COAF")
+    public ResponseEntity<SiscoafResponse> approve(@PathVariable UUID id, @RequestBody SiscoafApproveRequest request) {
+        return ResponseEntity.ok(siscoafService.approve(id, request.text()));
+    }
+
     @PostMapping("/{id}/submit")
     @PreAuthorize("hasRole('SUPERVISOR')")
-    @Operation(summary = "Envia a comunicacao ao COAF (acao explicita de SUPERVISOR)")
-    public ResponseEntity<SiscoafResponse> submit(@PathVariable UUID id) {
-        return ResponseEntity.ok(siscoafService.submit(id));
+    @Operation(summary = "Envia a comunicacao ao COAF (acao explicita de SUPERVISOR; reason opcional grava no historico)")
+    public ResponseEntity<SiscoafResponse> submit(@PathVariable UUID id,
+                                                  @RequestBody(required = false) SiscoafSubmitRequest request) {
+        return ResponseEntity.ok(siscoafService.submit(id, request != null ? request.reason() : null));
     }
 
     @PostMapping("/{id}/cancel")
@@ -69,11 +82,18 @@ public class SiscoafController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
-    @Operation(summary = "Lista comunicacoes por status (paginado)")
-    public ResponseEntity<Page<SiscoafResponse>> findByStatus(
-            @RequestParam(defaultValue = "DRAFT") String status,
+    @Operation(summary = "Lista comunicacoes (paginado). status/type aceitam varios valores; sem status = todos; periodo sobre a criacao")
+    public ResponseEntity<Page<SiscoafResponse>> findAll(
+            @RequestParam(required = false) List<String> status,
+            @RequestParam(required = false) List<String> type,
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to,
+            @RequestParam(required = false) UUID partyId,
+            @RequestParam(required = false) UUID caseId,
             Pageable pageable) {
-        return ResponseEntity.ok(siscoafService.findByStatus(status, pageable));
+        DateRange range = DateRange.of(from, to);
+        var filter = new SiscoafSpecifications.Filter(status, type, range.from(), range.toExclusive(), partyId, caseId);
+        return ResponseEntity.ok(siscoafService.findAll(filter, pageable));
     }
 
     @GetMapping("/{id}")

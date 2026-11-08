@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.RequestBuilder;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -53,11 +54,11 @@ class RoleMatrixAuthorizationTest {
     // ---- migration / user / admin: ADMIN ----
     @Test @WithMockUser(roles = "SUPERVISOR")
     void migrationDeniedForSupervisor() throws Exception {
-        mvc.perform(postJson("/api/v1/migration/batches")).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/migration/batches/" + UUID.randomUUID() + "/process")).andExpect(status().isForbidden());
     }
 
     @Test @WithMockUser(roles = "ADMIN")
-    void migrationAllowedForAdmin() throws Exception { allowed(postJson("/api/v1/migration/batches")); }
+    void migrationAllowedForAdmin() throws Exception { allowed(post("/api/v1/migration/batches/" + UUID.randomUUID() + "/process")); }
 
     @Test @WithMockUser(roles = "ANALYST")
     void usersDeniedForAnalyst() throws Exception { mvc.perform(get("/api/v1/users")).andExpect(status().isForbidden()); }
@@ -81,11 +82,11 @@ class RoleMatrixAuthorizationTest {
     // ---- watchlist: SUPERVISOR ----
     @Test @WithMockUser(roles = "ANALYST")
     void watchlistCreateDeniedForAnalyst() throws Exception {
-        mvc.perform(postJson("/api/v1/watchlist")).andExpect(status().isForbidden());
+        mvc.perform(post("/api/v1/watchlist/" + UUID.randomUUID() + "/deactivate")).andExpect(status().isForbidden());
     }
 
     @Test @WithMockUser(roles = "SUPERVISOR")
-    void watchlistCreateAllowedForSupervisor() throws Exception { allowed(postJson("/api/v1/watchlist")); }
+    void watchlistCreateAllowedForSupervisor() throws Exception { allowed(post("/api/v1/watchlist/" + UUID.randomUUID() + "/deactivate")); }
 
     // ---- party: leitura (inclui AUDITOR), escrita ANALYST/SUPERVISOR ----
     @Test @WithMockUser(roles = "AUDITOR")
@@ -93,12 +94,12 @@ class RoleMatrixAuthorizationTest {
 
     @Test @WithMockUser(roles = "AUDITOR")
     void partyWriteDeniedForAuditor() throws Exception {
-        mvc.perform(postJson("/api/v1/parties")).andExpect(status().isForbidden());
+        mvc.perform(delete("/api/v1/parties/" + UUID.randomUUID())).andExpect(status().isForbidden());
     }
 
     @Test @WithMockUser(roles = "ADMIN")
     void partyWriteDeniedForAdmin() throws Exception {
-        mvc.perform(postJson("/api/v1/parties")).andExpect(status().isForbidden());
+        mvc.perform(delete("/api/v1/parties/" + UUID.randomUUID())).andExpect(status().isForbidden());
     }
 
     @Test @WithMockUser(roles = "ANALYST")

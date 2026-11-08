@@ -22,4 +22,15 @@ public final class DataMasker {
         if (phone == null || phone.length() < 4) return "***";
         return "***" + phone.substring(phone.length() - 4);
     }
+
+    /** Nome (ex.: nome da mae): primeira letra de cada parte, o restante oculto. */
+    public static String maskName(String name) {
+        if (name == null || name.isBlank()) return "***";
+        StringBuilder sb = new StringBuilder();
+        for (String part : name.trim().split("\s+")) {
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(part.charAt(0)).append("***");
+        }
+        return sb.toString();
+    }
 }

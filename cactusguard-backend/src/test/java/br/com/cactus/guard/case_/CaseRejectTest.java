@@ -31,7 +31,7 @@ class CaseRejectTest {
 
     @Test
     @WithMockUser(username = "admin", roles = "SUPERVISOR")
-    void rejectCaseShouldUpdateStatus() {
+    void archiveCaseShouldCloseWithoutApproval() {
         Party party = Party.builder()
                 .type("PF")
                 .document("16161616161")
@@ -54,11 +54,12 @@ class CaseRejectTest {
         var caseResp = caseService.createFromAlert(alert.getId());
 
         CaseDecisionRequest decision = new CaseDecisionRequest();
-        decision.setDecision("REJECTED");
-        decision.setJustification("Indícios confirmados");
+        decision.setDecision("ARCHIVE");
+        decision.setJustification("Sem indícios após análise documental completa");
 
         var decided = caseService.decide(caseResp.getId(), decision);
-        assertEquals("REJECTED", decided.getStatus());
-        assertEquals("REJECTED", decided.getDecision());
+        assertEquals("ARCHIVED", decided.getStatus());
+        assertEquals("ARCHIVE", decided.getDecision());
+        assertNotNull(decided.getClosedAt());
     }
 }

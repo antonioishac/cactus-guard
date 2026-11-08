@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
+@org.hibernate.annotations.Immutable // append-only: Hibernate nunca emite UPDATE (trigger V22 rejeita)
 @Table(name = "data_access_log")
 @Data
 @Builder
@@ -31,7 +32,7 @@ public class DataAccessLog {
     @Column(name = "fields_accessed")
     private String fieldsAccessed;
 
-    @Column(name = "access_reason", length = 100)
+    @Column(name = "access_reason", length = 500)
     private String accessReason;
 
     @Column(name = "ip_address", length = 45)

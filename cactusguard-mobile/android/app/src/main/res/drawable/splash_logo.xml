@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Símbolo CactusGuard (spec 035) — gerado a partir de assets/logo/cactusguard-logo.svg -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp" android:height="120dp"
+    android:viewportWidth="48" android:viewportHeight="48">
+    <group android:translateX="0" android:translateY="0">
+        <path android:pathData="M24,8 C12,8 8,20 14,30" android:strokeColor="#00C9A7" android:strokeWidth="7" android:strokeLineCap="round" />
+        <path android:pathData="M40,30 C40,18 32,12 24,8" android:strokeColor="#C9A227" android:strokeWidth="7" android:strokeLineCap="round" />
+        <path android:pathData="M14,38 C22,44 36,42 40,30" android:strokeColor="#404040" android:strokeWidth="7" android:strokeLineCap="round" />
+    </group>
+</vector>

@@ -1,6 +1,6 @@
 package br.com.cactus.guard.party.controller;
 
-import br.com.cactus.guard.party.entity.PartyRelationship;
+import br.com.cactus.guard.party.dto.PartyRelationshipResponse;
 import br.com.cactus.guard.party.service.PartyRelationshipService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,8 +20,8 @@ public class PartyRelationshipController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR')")
-    public ResponseEntity<PartyRelationship> add(@PathVariable UUID partyId, @RequestBody Map<String, Object> body) {
-        PartyRelationship rel = service.add(
+    public ResponseEntity<PartyRelationshipResponse> add(@PathVariable UUID partyId, @RequestBody Map<String, Object> body) {
+        PartyRelationshipResponse rel = service.addResponse(
                 partyId,
                 UUID.fromString((String) body.get("relatedPartyId")),
                 (String) body.get("relationshipType"),
@@ -32,7 +32,7 @@ public class PartyRelationshipController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
-    public ResponseEntity<List<PartyRelationship>> list(@PathVariable UUID partyId) {
+    public ResponseEntity<List<PartyRelationshipResponse>> list(@PathVariable UUID partyId) {
         return ResponseEntity.ok(service.findByParty(partyId));
     }
 

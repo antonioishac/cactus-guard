@@ -1,6 +1,6 @@
 package br.com.cactus.guard.party.controller;
 
-import br.com.cactus.guard.party.entity.BeneficialOwner;
+import br.com.cactus.guard.party.dto.BeneficialOwnerResponse;
 import br.com.cactus.guard.party.service.BeneficialOwnerService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,19 +20,20 @@ public class BeneficialOwnerController {
 
     @PostMapping
     @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR')")
-    public ResponseEntity<BeneficialOwner> add(
+    public ResponseEntity<BeneficialOwnerResponse> add(
             @PathVariable UUID partyId,
             @RequestParam String document,
             @RequestParam String name,
             @RequestParam(required = false) BigDecimal ownershipPct,
             @RequestParam(required = false) String controlType,
-            @RequestParam(defaultValue = "false") boolean isPep) {
-        return ResponseEntity.ok(service.add(partyId, document, name, ownershipPct, controlType, isPep));
+            @RequestParam(defaultValue = "false") boolean isPep,
+            @RequestParam(required = false) String ownerType) {
+        return ResponseEntity.ok(service.addResponse(partyId, document, name, ownershipPct, controlType, isPep, ownerType));
     }
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
-    public ResponseEntity<List<BeneficialOwner>> list(@PathVariable UUID partyId) {
+    public ResponseEntity<List<BeneficialOwnerResponse>> list(@PathVariable UUID partyId) {
         return ResponseEntity.ok(service.findByParty(partyId));
     }
 

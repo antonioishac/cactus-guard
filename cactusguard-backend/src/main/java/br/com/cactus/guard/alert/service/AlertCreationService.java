@@ -1,6 +1,8 @@
 package br.com.cactus.guard.alert.service;
 
 import br.com.cactus.guard.alert.entity.Alert;
+import br.com.cactus.guard.common.event.CriticalAlertCreatedEvent;
+import org.springframework.context.ApplicationEventPublisher;
 import br.com.cactus.guard.alert.entity.AlertTransaction;
 import br.com.cactus.guard.alert.repository.AlertRepository;
 import br.com.cactus.guard.alert.repository.AlertTransactionRepository;
@@ -32,6 +34,7 @@ public class AlertCreationService {
     private final AlertRepository alertRepository;
     private final AlertTransactionRepository alertTransactionRepository;
     private final RegulatoryDeadlines deadlines;
+    private final ApplicationEventPublisher eventPublisher;
 
     /** Dados de um alerta a ser criado. */
     public record AlertDraft(Party party,
@@ -85,6 +88,9 @@ public class AlertCreationService {
                 .selectionDeadline(deadlines.selectionDeadline(occurredAt))
                 .build();
         alert = alertRepository.save(alert);
+        if ("CRITICAL".equals(alert.getSeverity())) {
+            eventPublisher.publishEvent(new CriticalAlertCreatedEvent(alert.getId()));
+        }
         for (Transaction t : txns) {
             alertTransactionRepository.save(AlertTransaction.builder().alert(alert).transaction(t).build());
         }

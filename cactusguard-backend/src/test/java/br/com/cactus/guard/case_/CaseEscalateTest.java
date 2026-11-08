@@ -2,7 +2,7 @@ package br.com.cactus.guard.case_;
 
 import br.com.cactus.guard.alert.entity.Alert;
 import br.com.cactus.guard.alert.repository.AlertRepository;
-import br.com.cactus.guard.case_.dto.CaseDecisionRequest;
+import br.com.cactus.guard.case_.dto.CaseEscalationRequest;
 import br.com.cactus.guard.case_.service.CaseService;
 import br.com.cactus.guard.party.entity.Party;
 import br.com.cactus.guard.party.repository.PartyRepository;
@@ -53,11 +53,14 @@ class CaseEscalateTest {
 
         var caseResp = caseService.createFromAlert(alert.getId());
 
-        CaseDecisionRequest decision = new CaseDecisionRequest();
-        decision.setDecision("ESCALATED");
-        decision.setJustification("Requer análise superior");
+        var escalated = caseService.escalate(caseResp.getId(),
+                new CaseEscalationRequest("Requer análise superior do comitê de PLD", null));
+        assertEquals("ESCALATED", escalated.getStatus());
+        assertEquals(1, escalated.getEscalationLevel());
+        assertNull(escalated.getDecidedAt(), "escalonamento nao e decisao final");
 
-        var decided = caseService.decide(caseResp.getId(), decision);
-        assertEquals("ESCALATED", decided.getStatus());
+        var twice = caseService.escalate(caseResp.getId(),
+                new CaseEscalationRequest("Segundo nível de escalonamento necessário", null));
+        assertEquals(2, twice.getEscalationLevel());
     }
 }

@@ -27,7 +27,20 @@ App Flutter focado em operação móvel do analista e supervisor, consumindo os 
 ## Identidade Visual
 - Logo oficial CactusGuard (spec 035).
 - Usar em splash screen, header e ícone do app.
+
+## Fora do escopo do MVP mobile
 - Configuração de regras
 - Relatórios complexos e exportação
 - Edição completa de dossiê
 - Gestão de usuários
+
+## Decisões (2026-11-08)
+- Pacote Android: `br.com.cactus.guard.mobile`. Alvo inicial: Android (iOS depois, exige macOS).
+- Push (FCM): app e backend preparados com envio real **desligado** até existir projeto Firebase (`google-services.json` + credencial do servidor por variável de ambiente).
+
+## Segurança mobile (obrigatório — PLD/LGPD)
+- Tokens só em armazenamento seguro (Android Keystore via `flutter_secure_storage`); nunca em SharedPreferences.
+- `FLAG_SECURE`: bloqueia screenshot, gravação de tela e preview no app switcher.
+- Desbloqueio por biometria ao voltar ao app + timeout de sessão por inatividade.
+- Push **sem PII nem nome de cliente**: payload só com tipo + id (ex.: `{"type":"ALERT","id":"…"}`); o app busca o detalhe autenticado. Evita vazamento em tela bloqueada e tipping-off (Lei 9.613, art. 11, II).
+- PII sempre mascarada; nada de dado sensível em log ou cache persistente.

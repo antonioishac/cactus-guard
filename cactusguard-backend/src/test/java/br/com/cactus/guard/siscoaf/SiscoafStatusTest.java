@@ -54,7 +54,7 @@ class SiscoafStatusTest {
         alert = alertRepository.save(alert);
 
         var caseResp = caseService.createFromAlert(alert.getId());
-        var draft = siscoafService.createDraft(caseResp.getId(), "COS", Map.of("value", 50000));
+        var draft = siscoafService.createDraft(caseResp.getId(), "COE", Map.of("value", 50000));
         var submitted = siscoafService.submit(draft.getId());
 
         assertNotNull(submitted.getProtocolNumber());

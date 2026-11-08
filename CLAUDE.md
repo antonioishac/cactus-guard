@@ -6,7 +6,8 @@ Plataforma SaaS de Prevenção à Lavagem de Dinheiro e Financiamento do Terrori
 - Backend `cactusguard-backend/`: Java 25, Spring Boot 4.x, PostgreSQL, Redis, Flyway, Resilience4j, JWT. Detalhes: `cactusguard-backend/CLAUDE.md`.
   - Testes: `cd cactusguard-backend && JAVA_HOME=/c/Java/jdk-25.0.2 mvn test`
   - Um teste: `JAVA_HOME=/c/Java/jdk-25.0.2 mvn test -Dtest=NomeDoTest`
-- Web `cactusguard-web/`: React 18 + Vite + Tailwind + Zustand. `npm run dev` | `npm run build` (inclui `tsc`).
+- Web `cactusguard-web/`: React 19 + Vite + Tailwind 4 + TanStack Query + MSW. `npm run dev` (ou `dev:mock`) | `npm run typecheck` | `npm test -- --run` | `npm run build`. Detalhes: `cactusguard-web/CLAUDE.md`.
+- Mobile `cactusguard-mobile/`: Flutter + Riverpod + Dio + go_router (Android; pacote `br.com.cactus.guard.mobile`). `flutter analyze` | `flutter test`. Detalhes: `cactusguard-mobile/CLAUDE.md`.
 
 ## Invariantes regulatórias (nunca violar)
 - Decisão de case é humana: `COMMUNICATE` ou `ARCHIVE`, com justificativa obrigatória. Escalar não é decisão.
@@ -22,6 +23,7 @@ Plataforma SaaS de Prevenção à Lavagem de Dinheiro e Financiamento do Terrori
 ## Qual spec ler (índice completo: `specs/README.md`)
 | Tarefa | Spec |
 |---|---|
+| **Prioridade, fase atual, arquitetura-alvo (PLD+FT+Fraude)** | **specs/048** |
 | Prazos, COAF, retenção, CSNU | specs/003 |
 | Campos de entidade / migration nova | specs/046, specs/002 |
 | Regras e cenários | specs/008, 009, 013 |

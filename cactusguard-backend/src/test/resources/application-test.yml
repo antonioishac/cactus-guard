@@ -25,8 +25,6 @@ security:
     allowed-origins: http://localhost:3000
   hsts:
     enabled: false
-  admin-bootstrap:
-    password: admin123
 springdoc:
   api-docs:
     enabled: true

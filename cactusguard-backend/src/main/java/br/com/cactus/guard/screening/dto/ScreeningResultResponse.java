@@ -18,4 +18,10 @@ public class ScreeningResultResponse {
     private String matchType;
     private String status;
     private Instant createdAt;
+    private String partyName;
+    /** Lista exige indisponibilidade de ativos (CSNU): confirmar bloqueia a parte imediatamente. */
+    private boolean requiresAssetFreeze;
+    private String reviewJustification;
+    private Instant reviewedAt;
+    private String reviewedByName;
 }

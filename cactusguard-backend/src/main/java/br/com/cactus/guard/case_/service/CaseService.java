@@ -1,5 +1,6 @@
 package br.com.cactus.guard.case_.service;
 
+import br.com.cactus.guard.common.audit.AuditPayload;
 import br.com.cactus.guard.alert.entity.Alert;
 import br.com.cactus.guard.alert.repository.AlertRepository;
 import br.com.cactus.guard.audit.service.AuditService;
@@ -11,6 +12,11 @@ import br.com.cactus.guard.case_.dto.CaseDecisionRequest;
 import br.com.cactus.guard.case_.dto.CaseEscalationRequest;
 import br.com.cactus.guard.case_.dto.CaseResponse;
 import br.com.cactus.guard.case_.entity.Case;
+import br.com.cactus.guard.common.event.CasePendingApprovalEvent;
+import org.springframework.context.ApplicationEventPublisher;
+import br.com.cactus.guard.case_.repository.CaseSpecifications;
+import br.com.cactus.guard.alert.entity.AlertHistory;
+import br.com.cactus.guard.alert.repository.AlertHistoryRepository;
 import br.com.cactus.guard.case_.repository.CaseRepository;
 import br.com.cactus.guard.common.calendar.RegulatoryDeadlines;
 import br.com.cactus.guard.common.exception.BusinessException;
@@ -57,9 +63,24 @@ public class CaseService {
     private final CurrentUserService currentUser;
     private final RegulatoryDeadlines deadlines;
     private final SiscoafDraftService draftService;
+    private final CaseNumberService caseNumberService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final AlertHistoryRepository alertHistoryRepository;
 
+    /** Selecao sem justificativa textual (alias legado POST /cases/from-alert/{id}). */
     @Transactional
     public CaseResponse createFromAlert(UUID alertId) {
+        return createFromAlert(alertId, null);
+    }
+
+    /**
+     * Seleciona o alerta e abre o case. A justificativa (quando informada) e registrada na auditoria
+     * e no historico do alerta; em POST /cases ela e obrigatoria (validada no controller/DTO).
+     */
+    @Transactional
+    public CaseResponse createFromAlert(UUID alertId, String justification) {
+        String selectionJustification = justification == null ? null
+                : Justifications.require(justification, "selecao do alerta (abertura de case)");
         Alert alert = alertRepository.findById(alertId)
                 .orElseThrow(() -> new IllegalArgumentException("Alert not found"));
 
@@ -80,16 +101,26 @@ public class CaseService {
                 .edd(party != null && party.isEddRequired())
                 .totalAmountInvolved(alert.getTotalAmount())
                 .indicatorCodes(alert.getRuleCode() != null ? List.of(alert.getRuleCode()) : null)
+                .caseNumber(caseNumberService.next())
                 .build();
 
         caseEntity = caseRepository.save(caseEntity);
 
+        User selector = currentUser.user().orElse(null);
+        alertHistoryRepository.save(AlertHistory.builder()
+                .alert(alert).action("CASE_OPENED").fromStatus(alert.getStatus()).toStatus(alert.getStatus())
+                .performedBy(selector).comment(selectionJustification).build());
+
         Map<String, Object> created = new LinkedHashMap<>();
+        created.put("caseNumber", caseEntity.getCaseNumber());
+        if (selectionJustification != null) {
+            created.put("selectionJustification", selectionJustification);
+        }
         created.put("alertId", alertId.toString());
         created.put("selectedAt", selectedAt.toString());
         created.put("analysisDeadline", analysisDeadline.toString());
         created.put("slaDueDate", caseEntity.getSlaDueDate().toString());
-        auditService.log("CASE_CREATED", "CASE", caseEntity.getId(), null, created);
+        AuditPayload.log(auditService, "CASE_CREATED", "CASE", caseEntity.getId(), null, created);
 
         Instant selectionDeadline = alert.getSelectionDeadline();
         if (selectionDeadline != null && selectedAt.isAfter(selectionDeadline)) {
@@ -99,7 +130,7 @@ public class CaseService {
             late.put("selectionDeadline", selectionDeadline.toString());
             late.put("selectedAt", selectedAt.toString());
             late.put("daysLate", Duration.between(selectionDeadline, selectedAt).toDays());
-            auditService.log("CASE_LATE_SELECTION", "CASE", caseEntity.getId(), null, late);
+            AuditPayload.log(auditService, "CASE_LATE_SELECTION", "CASE", caseEntity.getId(), null, late);
         }
         return toResponse(caseEntity);
     }
@@ -110,6 +141,14 @@ public class CaseService {
                 ? caseRepository.findByStatus(status, pageable)
                 : caseRepository.findAll(pageable);
         return page.map(this::toResponse);
+    }
+
+    /** Listagem filtrada (status multiplos, responsavel, SLA regulatorio, risco da parte, EDD, periodo). */
+    @Transactional(readOnly = true)
+    public Page<CaseResponse> findAll(CaseSpecifications.Filter filter, Pageable pageable) {
+        Instant now = Instant.now();
+        return caseRepository.findAll(CaseSpecifications.from(filter, now), pageable)
+                .map(c -> toResponse(c, now));
     }
 
     /**
@@ -129,7 +168,8 @@ public class CaseService {
         return caseRepository.countByDecidedAtIsNull();
     }
 
-    @Transactional(readOnly = true)
+    /** Nao e readOnly: o acesso a decisao/justificativa e registrado (LGPD) na mesma transacao. */
+    @Transactional
     public CaseResponse findById(UUID id) {
         Case c = caseRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("Case not found"));
@@ -171,12 +211,16 @@ public class CaseService {
             c.setClosedAt(now);
         }
         c = caseRepository.save(c);
+        if ("PENDING_APPROVAL".equals(c.getStatus())) {
+            eventPublisher.publishEvent(new CasePendingApprovalEvent(c.getId(),
+                    c.getDecidedBy() != null ? c.getDecidedBy().getId() : null));
+        }
 
         if (user != null) {
             notificationService.create(user.getId(), "CASE_DECIDED", "Case decidido",
                     "Decisão " + decision + " registrada no case", "CASE", c.getId());
         }
-        auditService.log("CASE_DECIDED", "CASE", c.getId(), before, snapshot(c));
+        AuditPayload.log(auditService, "CASE_DECIDED", "CASE", c.getId(), before, snapshot(c));
         return toResponse(c);
     }
 
@@ -225,7 +269,57 @@ public class CaseService {
         if (request != null && request.comment() != null && !request.comment().isBlank()) {
             after.put("approvalComment", request.comment().trim());
         }
-        auditService.log("CASE_APPROVED", "CASE", c.getId(), before, after);
+        AuditPayload.log(auditService, "CASE_APPROVED", "CASE", c.getId(), before, after);
+        return toResponse(c);
+    }
+
+    /**
+     * Rejeicao da aprovacao (quatro olhos): SUPERVISOR diferente de quem decidiu devolve o case para
+     * analise. A decisao pendente e limpa (o case volta a aceitar nova decisao), mas a decisao rejeitada
+     * e a justificativa da rejeicao permanecem na trilha de auditoria (audit_log append-only).
+     */
+    @Transactional
+    public CaseResponse rejectApproval(UUID caseId, String justification) {
+        if (!currentUser.hasRole("SUPERVISOR")) {
+            throw new AccessDeniedException("Rejeicao de aprovacao exige perfil SUPERVISOR");
+        }
+        String just = Justifications.require(justification, "rejeicao de aprovacao de case");
+        Case c = caseRepository.findById(caseId)
+                .orElseThrow(() -> new BusinessException("Case não encontrado"));
+        if (!"PENDING_APPROVAL".equals(c.getStatus())) {
+            throw new BusinessException("Case nao esta aguardando aprovacao (status " + c.getStatus() + ")");
+        }
+        User reviewer = currentUser.user()
+                .orElseThrow(() -> new BusinessException("Revisor nao identificado"));
+        User decider = c.getDecidedBy();
+        if (decider == null) {
+            throw new BusinessException("Decisor nao identificado: rejeicao impossivel");
+        }
+        if (reviewer.getId().equals(decider.getId())) {
+            throw new BusinessException("Quatro olhos: a rejeicao deve ser feita por SUPERVISOR diferente de quem decidiu o case");
+        }
+
+        Map<String, Object> before = snapshot(c);
+        String rejectedDecision = c.getDecision();
+        c.setDecision(null);
+        c.setDecisionJustification(null);
+        c.setDecidedBy(null);
+        c.setDecidedAt(null);
+        c.setApprovedBy(null);
+        c.setApprovedAt(null);
+        c.setCommunicationDeadline(null);
+        c.setStatus("IN_ANALYSIS");
+        c = caseRepository.save(c);
+
+        Map<String, Object> after = snapshot(c);
+        after.put("rejectedDecision", rejectedDecision);
+        after.put("rejectedDecisionBy", decider.getId().toString());
+        after.put("rejectionJustification", just);
+        after.put("rejectedBy", reviewer.getId().toString());
+        AuditPayload.log(auditService, "CASE_APPROVAL_REJECTED", "CASE", c.getId(), before, after);
+
+        notificationService.create(decider.getId(), "CASE_APPROVAL_REJECTED", "Aprovação rejeitada",
+                "A decisão proposta foi devolvida para análise", "CASE", c.getId());
         return toResponse(c);
     }
 
@@ -254,7 +348,7 @@ public class CaseService {
 
         Map<String, Object> after = snapshot(c);
         after.put("escalationJustification", justification);
-        auditService.log("CASE_ESCALATED", "CASE", c.getId(), before, after);
+        AuditPayload.log(auditService, "CASE_ESCALATED", "CASE", c.getId(), before, after);
         return toResponse(c);
     }
 
@@ -308,25 +402,36 @@ public class CaseService {
         };
     }
 
-    private CaseResponse toResponse(Case c) {
+    public CaseResponse toResponse(Case c) {
+        return toResponse(c, Instant.now());
+    }
+
+    private CaseResponse toResponse(Case c, Instant now) {
         return CaseResponse.builder()
                 .id(c.getId())
+                .caseNumber(c.getCaseNumber())
                 .alertId(c.getAlert() != null ? c.getAlert().getId() : null)
                 .partyId(c.getParty() != null ? c.getParty().getId() : null)
                 .partyName(c.getParty() != null ? c.getParty().getName() : null)
+                .partyRiskLevel(c.getParty() != null ? c.getParty().getRiskLevel() : null)
                 .status(c.getStatus())
                 .priority(c.getPriority())
                 .assignedToId(c.getAssignedTo() != null ? c.getAssignedTo().getId() : null)
                 .decision(c.getDecision())
                 .decisionJustification(c.getDecisionJustification())
+                .decidedById(c.getDecidedBy() != null ? c.getDecidedBy().getId() : null)
                 .decidedAt(c.getDecidedAt())
                 .slaDueDate(c.getSlaDueDate())
+                .slaStatus(SlaCalculator.classify(c, now))
                 .occurredAt(c.getOccurredAt())
+                .selectionDeadline(c.getAlert() != null ? c.getAlert().getSelectionDeadline() : null)
                 .selectedAt(c.getSelectedAt())
                 .analysisDeadline(c.getAnalysisDeadline())
                 .communicationDeadline(c.getCommunicationDeadline())
                 .escalationLevel(c.getEscalationLevel())
                 .edd(c.isEdd())
+                .indicatorCodes(c.getIndicatorCodes())
+                .totalAmountInvolved(c.getTotalAmountInvolved())
                 .approvedById(c.getApprovedBy() != null ? c.getApprovedBy().getId() : null)
                 .approvedAt(c.getApprovedAt())
                 .closedAt(c.getClosedAt())

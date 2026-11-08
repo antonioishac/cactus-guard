@@ -121,13 +121,16 @@ public class BusinessCalendar {
         return nextBusinessDay(instant.atZone(BRAZIL).toLocalDate());
     }
 
-    /** Fim do dia (23:59:59.999999999, America/Sao_Paulo) do dia util seguinte: limite inclusivo do prazo. */
+    /** Fim do dia (23:59:59.999999, America/Sao_Paulo) do dia util seguinte: limite inclusivo do prazo. */
     public Instant nextBusinessDayDeadline(Instant instant) {
         return endOfDay(nextBusinessDay(instant));
     }
 
+    /** Ultimo instante do dia com precisao de microssegundos (bancos arredondam nanos para cima e virariam o dia seguinte). */
+    public static final LocalTime END_OF_DAY = LocalTime.of(23, 59, 59, 999_999_000);
+
     public static Instant endOfDay(LocalDate date) {
-        return ZonedDateTime.of(date, LocalTime.MAX, BRAZIL).toInstant();
+        return ZonedDateTime.of(date, END_OF_DAY, BRAZIL).toInstant();
     }
 
     /** Soma dias corridos no fuso do Brasil (sem deslocar horario em mudancas de offset). */

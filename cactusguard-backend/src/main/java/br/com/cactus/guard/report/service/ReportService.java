@@ -153,6 +153,7 @@ public class ReportService {
                 .downloadable(job.getFilePath() != null)
                 .createdAt(job.getCreatedAt())
                 .completedAt(job.getCompletedAt())
+                .errorMessage(job.getErrorMessage())
                 .build();
     }
 }

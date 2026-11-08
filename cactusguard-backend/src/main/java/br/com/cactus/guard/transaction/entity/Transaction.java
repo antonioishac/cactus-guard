@@ -41,7 +41,9 @@ public class Transaction {
     @Column(name = "counterparty_name")
     private String counterpartyName;
 
-    @Column(name = "counterparty_document", length = 20)
+    // PII cifrada (V30): busca somente por counterparty_document_hash
+    @Convert(converter = br.com.cactus.guard.crypto.EncryptedStringConverter.class)
+    @Column(name = "counterparty_document", length = 512)
     private String counterpartyDocument;
 
     @Column(length = 30)

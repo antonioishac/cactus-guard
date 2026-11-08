@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @Entity
+@org.hibernate.annotations.Immutable // append-only: Hibernate nunca emite UPDATE (trigger V22 rejeita)
 @Table(name = "audit_log")
 @Getter
 @Setter

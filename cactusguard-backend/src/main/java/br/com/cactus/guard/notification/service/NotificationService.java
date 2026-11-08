@@ -54,8 +54,22 @@ public class NotificationService {
     public void markAsRead(UUID notificationId) {
         Notification notification = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new IllegalArgumentException("Notification not found"));
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        if (!notification.getUser().getUsername().equals(username)) {
+            // nao revela a existencia de notificacoes de outros usuarios
+            throw new IllegalArgumentException("Notification not found");
+        }
         notification.setRead(true);
         notificationRepository.save(notification);
+    }
+
+    /** Marca todas as notificacoes do usuario autenticado como lidas; devolve quantas foram atualizadas. */
+    @Transactional
+    public int markAllAsRead() {
+        String username = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        return notificationRepository.markAllReadByUserId(user.getId());
     }
 
     @Transactional(readOnly = true)

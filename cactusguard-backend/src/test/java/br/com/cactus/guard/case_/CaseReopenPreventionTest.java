@@ -55,13 +55,13 @@ class CaseReopenPreventionTest {
         var caseResp = caseService.createFromAlert(alert.getId());
 
         CaseDecisionRequest decision = new CaseDecisionRequest();
-        decision.setDecision("APPROVED");
-        decision.setJustification("Primeira decisão");
+        decision.setDecision("ARCHIVE");
+        decision.setJustification("Primeira decisão após análise completa");
         caseService.decide(caseResp.getId(), decision);
 
         CaseDecisionRequest second = new CaseDecisionRequest();
-        second.setDecision("REJECTED");
-        second.setJustification("Tentativa de reabertura");
+        second.setDecision("COMMUNICATE");
+        second.setJustification("Tentativa de reabertura do case encerrado");
 
         assertThrows(BusinessException.class, () -> caseService.decide(caseResp.getId(), second));
     }

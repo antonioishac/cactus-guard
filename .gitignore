@@ -26,6 +26,16 @@ reports/
 uploads/
 storage/
 
+# Flutter (cactusguard-mobile)
+cactusguard-mobile/build/
+.dart_tool/
+.flutter-plugins-dependencies
+android/local.properties
+ios/Flutter/Generated.xcconfig
+# Firebase: credenciais nunca versionadas
+**/google-services.json
+**/GoogleService-Info.plist
+
 # Claude Code (config pessoal)
 .claude/settings.local.json
 CLAUDE.local.md

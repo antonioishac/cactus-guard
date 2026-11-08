@@ -12,8 +12,10 @@ security:
     allowed-origins: http://localhost:3000,http://localhost:5173
   hsts:
     enabled: false
-  admin-bootstrap:
-    password: admin123
+spring:
+  flyway:
+    # dev: migrations oficiais + usuários de desenvolvimento (db/dev/R__dev_users.sql)
+    locations: classpath:db/migration,classpath:db/dev
 springdoc:
   api-docs:
     enabled: true

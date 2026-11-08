@@ -58,6 +58,13 @@ public class KycService {
                     "Não é possível aprovar: " + incompleteRequired + " item(ns) obrigatório(s) incompleto(s)");
         }
 
+        br.com.cactus.guard.party.entity.Party partyToApprove = process.getParty();
+        if (partyToApprove != null && partyToApprove.isPep() && !"EXPIRED".equals(partyToApprove.getPepStatus())
+                && partyToApprove.getPepApprovalBy() == null) {
+            throw new br.com.cactus.guard.common.exception.BusinessException(
+                    "Relacionamento com PEP exige aprovação prévia da alta administração (aprovação de PEP pendente)");
+        }
+
         orchestrator.validateDocument(process);
 
         process.setStatus("APPROVED");
@@ -78,6 +85,14 @@ public class KycService {
 
         // Notify is handled by the assigned user if present
         return toResponse(process);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<KycProcessResponse> findByParty(UUID partyId, String status, Pageable pageable) {
+        Page<KycProcess> page = (status == null || status.isBlank())
+                ? kycRepository.findByPartyId(partyId, pageable)
+                : kycRepository.findByPartyIdAndStatus(partyId, status, pageable);
+        return page.map(this::toResponse);
     }
 
     @Transactional(readOnly = true)

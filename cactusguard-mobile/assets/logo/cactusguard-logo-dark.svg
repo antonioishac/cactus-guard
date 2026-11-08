@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Variante para fundo escuro: mesma composição; charcoal clareado para contraste. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none" stroke-width="7" stroke-linecap="round" role="img" aria-label="CactusGuard">
+  <path d="M24 8 C12 8 8 20 14 30" stroke="#00c9a7"/>
+  <path d="M40 30 C40 18 32 12 24 8" stroke="#c9a227"/>
+  <path d="M14 38 C22 44 36 42 40 30" stroke="#d4d4d4"/>
+</svg>

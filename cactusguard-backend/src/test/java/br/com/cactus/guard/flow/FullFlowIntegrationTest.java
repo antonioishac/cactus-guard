@@ -57,12 +57,12 @@ class FullFlowIntegrationTest {
         assertEquals(alert.getId(), caseResponse.getAlertId());
 
         CaseDecisionRequest decision = new CaseDecisionRequest();
-        decision.setDecision("APPROVED");
+        decision.setDecision("ARCHIVE");
         decision.setJustification("Análise completa sem indícios");
 
         var decided = caseService.decide(caseResponse.getId(), decision);
-        assertEquals("APPROVED", decided.getStatus());
-        assertEquals("APPROVED", decided.getDecision());
+        assertEquals("ARCHIVED", decided.getStatus());
+        assertEquals("ARCHIVE", decided.getDecision());
         assertNotNull(decided.getDecidedAt());
     }
 }

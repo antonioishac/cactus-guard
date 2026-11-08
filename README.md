@@ -79,22 +79,37 @@ npm run dev
 ## Configuração
 
 ### Banco de Dados
-```yaml
-spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/cactusguard
-    username: postgres
-    password: postgres
+Desenvolvimento: **zero configuração**.
+
+```bash
+cd cactusguard-backend && mvn spring-boot:run   # perfil "dev" é o padrão; Flyway cria o schema
 ```
 
+Infra local (containers administrados fora deste repositório):
+- PostgreSQL `pgvector/pgvector:pg17` em `127.0.0.1:5432`, banco `cactusguard`, `app_user` / `app_password`.
+- Redis em `127.0.0.1:6379`.
+
+Usuários de dev (criados por `db/dev/R__dev_users.sql`, só no perfil dev):
+
+| Usuário | Senha | Perfil |
+|---|---|---|
+| `admin` | `admin123` | ADMIN |
+| `analista` | `dev12345` | ANALYST |
+| `supervisor` / `supervisor2` | `dev12345` | SUPERVISOR (2 para testar quatro olhos) |
+| `auditor` | `dev12345` | AUDITOR |
+
+| Variável (opcional) | Padrão de dev |
+|---|---|
+| `CACTUS_DB_URL` | `jdbc:postgresql://127.0.0.1:5432/cactusguard` |
+| `CACTUS_DB_USERNAME` | `app_user` |
+| `CACTUS_DB_PASSWORD` | `app_password` |
+
+- Use `127.0.0.1`, não `localhost`: no Windows com Docker Desktop, `::1:5432` pode ser atendido pelo `wslrelay`.
+- Prefixo `CACTUS_` evita colisão com variáveis `DB_*` de outros projetos.
+- ⚠️ Credencial de dev versionada **temporariamente**. Produção: `SPRING_PROFILES_ACTIVE=prod` + segredos via variável/cofre (`JWT_SECRET`, `ENCRYPTION_KEYS`, `DOCUMENT_HASH_KEY`, `CACTUS_DB_*`).
+
 ### Redis
-```yaml
-spring:
-  data:
-    redis:
-      host: localhost
-      port: 6379
-```
+Container local em `127.0.0.1:6379`. Variáveis opcionais: `CACTUS_REDIS_HOST` (padrão `127.0.0.1`) e `CACTUS_REDIS_PORT` (padrão `6379`).
 
 ## Design
 

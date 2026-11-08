@@ -1,5 +1,6 @@
 package br.com.cactus.guard.siscoaf.service;
 
+import br.com.cactus.guard.common.audit.AuditPayload;
 import br.com.cactus.guard.audit.service.AuditService;
 import br.com.cactus.guard.common.calendar.BusinessCalendar;
 import br.com.cactus.guard.rule.entity.MonitoringRule;
@@ -128,7 +129,7 @@ public class CashCommunicationService {
         audit.put("threshold", threshold);
         audit.put("deadlineAt", deadline.toString());
         audit.put("basis", "Comunicacao automatica de especie >= limiar (excecao legal: dispensa decisao de suspeita)");
-        auditService.log("COE_AUTO_CREATED", "SISCOAF_COMMUNICATION", coe.getId(), null, audit);
+        AuditPayload.log(auditService, "COE_AUTO_CREATED", "SISCOAF_COMMUNICATION", coe.getId(), null, audit);
         return Optional.of(coe);
     }
 }

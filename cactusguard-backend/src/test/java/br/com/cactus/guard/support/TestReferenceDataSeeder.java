@@ -1,7 +1,11 @@
 package br.com.cactus.guard.support;
 
 import br.com.cactus.guard.auth.entity.Role;
+import br.com.cactus.guard.auth.entity.User;
 import br.com.cactus.guard.auth.repository.RoleRepository;
+import br.com.cactus.guard.auth.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import java.util.Set;
 import br.com.cactus.guard.report.entity.ReportDefinition;
 import br.com.cactus.guard.report.repository.ReportDefinitionRepository;
 import br.com.cactus.guard.rule.entity.MonitoringRule;
@@ -31,6 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class TestReferenceDataSeeder implements ApplicationRunner {
 
     private final RoleRepository roleRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
     private final ReportDefinitionRepository reportDefinitionRepository;
     private final MonitoringRuleRepository ruleRepository;
     private final ScreeningListRepository listRepository;
@@ -42,6 +48,10 @@ public class TestReferenceDataSeeder implements ApplicationRunner {
         role("ANALYST", "Analista de PLD");
         role("SUPERVISOR", "Supervisor de compliance");
         role("AUDITOR", "Auditor (somente leitura)");
+
+        // Usuário "admin" usado por vários testes (@WithMockUser("admin") precisa existir no banco).
+        // Em dev ele vem de db/dev/R__dev_users.sql; aqui (H2, sem Flyway) é criado via JPA.
+        adminUser();
 
         report("ALERTS_SUMMARY", "Resumo de Alertas", "OPERATIONAL", "Alertas por status, severidade e período");
         report("CASES_SLA", "Cases e SLA", "OPERATIONAL", "Cases abertos, vencidos e decididos");
@@ -58,9 +68,32 @@ public class TestReferenceDataSeeder implements ApplicationRunner {
         rule("WATCHLIST_MATCH", "Match em Watchlist Interna", "SCREENING", "HIGH", "Gera alerta quando parte está na watchlist interna");
         rule("UBO_PEP", "UBO identificado como PEP", "SCREENING", "HIGH", "Gera alerta quando beneficiário final é marcado como PEP");
 
+        // Cenarios V27: nascem PENDING_APPROVAL e inativos (dependem de aprovacao)
+        pendingRule("CASH_50K", "Operação em espécie >= R$ 50 mil", "CASH", "HIGH");
+        pendingRule("PEP_TRANSACTION", "Movimentação relevante de PEP", "PEP", "HIGH");
+        pendingRule("PASS_THROUGH", "Conta de passagem", "TRANSACTIONAL", "HIGH");
+        pendingRule("ROUND_AMOUNTS", "Valores redondos", "TRANSACTIONAL", "MEDIUM");
+        pendingRule("HIGH_RISK_JURISDICTION", "Jurisdição de alto risco", "GEOGRAPHIC", "HIGH");
+        pendingRule("PROFILE_INCOMPATIBLE", "Incompatível com perfil", "BEHAVIORAL", "HIGH");
+
         list("PEP_BR", "PEP Brasil", "PEP", "COAF / Receita");
         list("UN_SANCTIONS", "Sanções ONU", "SANCTION", "UN Security Council");
+        freezeList("CSNU", "Sanções CSNU (Lei 13.810/2019)", "CSNU", "UN Security Council");
         list("OFAC", "OFAC SDN", "SANCTION", "US Treasury");
+    }
+
+    private void adminUser() {
+        if (userRepository.findByUsername("admin").isPresent()) {
+            return;
+        }
+        userRepository.save(User.builder()
+                .username("admin")
+                .email("admin@cactusguard.test")
+                .password(passwordEncoder.encode("admin123"))
+                .name("Administrador")
+                .active(true)
+                .roles(Set.of(roleRepository.findByName("ADMIN").orElseThrow()))
+                .build());
     }
 
     private void role(String name, String description) {
@@ -100,6 +133,28 @@ public class TestReferenceDataSeeder implements ApplicationRunner {
         ruleRepository.save(rule);
     }
 
+    private void pendingRule(String code, String name, String category, String severity) {
+        if (ruleRepository.findByCode(code).isPresent()) {
+            return;
+        }
+        MonitoringRule rule = new MonitoringRule();
+        rule.setCode(code);
+        rule.setName(name);
+        rule.setCategory(category);
+        rule.setSeverity(severity);
+        rule.setActive(false);
+        rule.setStatus("PENDING_APPROVAL");
+        ruleRepository.save(rule);
+    }
+
+    private void freezeList(String code, String name, String type, String source) {
+        list(code, name, type, source);
+        listRepository.findByCode(code).ifPresent(l -> {
+            l.setRequiresAssetFreeze(true);
+            listRepository.save(l);
+        });
+    }
+
     private void list(String code, String name, String type, String source) {
         if (listRepository.findByCode(code).isPresent()) {
             return;
@@ -110,6 +165,7 @@ public class TestReferenceDataSeeder implements ApplicationRunner {
         list.setType(type);
         list.setSource(source);
         list.setActive(true);
+        list.setRequiresAssetFreeze("UN_SANCTIONS".equals(code));
         listRepository.save(list);
     }
 }

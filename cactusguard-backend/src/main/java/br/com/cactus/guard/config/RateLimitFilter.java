@@ -31,7 +31,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
             response.setStatus(429);
             response.setHeader("Retry-After", "60");
             response.setContentType("application/json");
-            response.getWriter().write("{\"error\":\"RATE_LIMIT_EXCEEDED\",\"message\":\"Limite de requisições excedido.\"}");
+            response.getWriter().write("{\"status\":429,\"error\":\"RATE_LIMIT_EXCEEDED\",\"code\":\"RATE_LIMITED\",\"message\":\"Limite de requisições excedido.\",\"traceId\":\"" + org.slf4j.MDC.get("traceId") + "\"}");
         }
     }
 

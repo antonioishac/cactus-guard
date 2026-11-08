@@ -28,6 +28,7 @@ class EndpointSecurityCoverageTest {
             "AuthController#login", "AuthController#refresh", "AuthController#logout", "HealthController#health");
 
     @Autowired
+    @org.springframework.beans.factory.annotation.Qualifier("requestMappingHandlerMapping")
     private RequestMappingHandlerMapping handlerMapping;
 
     @Test

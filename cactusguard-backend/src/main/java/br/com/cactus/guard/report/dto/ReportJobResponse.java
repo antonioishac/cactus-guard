@@ -18,4 +18,6 @@ public class ReportJobResponse {
     private boolean downloadable;
     private Instant createdAt;
     private Instant completedAt;
+    /** Mensagem generica de falha (status FAILED); detalhes tecnicos ficam apenas no log. */
+    private String errorMessage;
 }

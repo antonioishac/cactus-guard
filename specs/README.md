@@ -31,6 +31,7 @@ Leia sob demanda: só a spec da tarefa. Em conflito, vale a interpretação regu
 ## Arquitetura e engenharia (backend)
 | Arquivo | Conteúdo |
 |---|---|
+| 048-estrategia-competitiva-roadmap.md | **Norteadora**: posicionamento FRAML, lacunas, arquitetura-alvo e roadmap por fases |
 | 047-padroes-tecnicos-backend.md | Java 25 / Spring Boot 4.x, pacotes, hexagonal seletivo, Kafka, multi-tenancy, FTS |
 | 005-arquitetura-tecnica.md | Arquitetura técnica geral |
 | 006-roadmap.md | Roadmap e fases |

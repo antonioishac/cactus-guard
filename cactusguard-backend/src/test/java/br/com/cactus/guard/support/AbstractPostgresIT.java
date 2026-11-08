@@ -1,8 +1,9 @@
 package br.com.cactus.guard.support;
 
+import org.junit.jupiter.api.condition.EnabledIf;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
-import org.testcontainers.junit.jupiter.Container;
+import org.testcontainers.DockerClientFactory;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 
@@ -16,9 +17,11 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
  * <p>
  * Roda no {@code mvn verify} (failsafe, sufixo *IT). Sem Docker os testes sao pulados.
  */
-@Testcontainers(disabledWithoutDocker = true)
+@EnabledIf(value = "dockerAvailable", disabledReason = "Docker indisponivel")
 @SpringBootTest(properties = {
         "spring.flyway.enabled=true",
+        // só migrations oficiais: o seed de dev (db/dev) não entra nos ITs
+        "spring.flyway.locations=classpath:db/migration",
         "spring.jpa.hibernate.ddl-auto=validate",
         "spring.cache.type=simple",
         "jwt.secret=it-secret-key-for-integration-tests-only-0123456789",
@@ -31,8 +34,25 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 })
 public abstract class AbstractPostgresIT {
 
-    /** Mesma major version do docker-compose.yml. Container compartilhado entre as classes IT. */
-    @Container
+    /**
+     * Mesma major version do docker-compose.yml. Container singleton para toda a JVM dos ITs: iniciado uma
+     * unica vez (o Ryuk o remove ao fim). Com {@code @Container} estatico o container era parado/reiniciado
+     * a cada classe, mas o contexto Spring em cache continuava apontando para a porta antiga, quebrando a
+     * segunda IT que compartilhasse o mesmo contexto.
+     */
     @ServiceConnection
     protected static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:16-alpine");
+
+    private static final boolean DOCKER_AVAILABLE = DockerClientFactory.instance().isDockerAvailable();
+
+    static {
+        if (DOCKER_AVAILABLE) {
+            POSTGRES.start();
+        }
+    }
+
+    /** Condição do {@code @EnabledIf}: sem Docker, os ITs são pulados (não falham). */
+    static boolean dockerAvailable() {
+        return DOCKER_AVAILABLE;
+    }
 }

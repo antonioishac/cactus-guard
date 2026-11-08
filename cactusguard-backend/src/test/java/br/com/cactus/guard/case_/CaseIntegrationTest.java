@@ -73,7 +73,7 @@ class CaseIntegrationTest {
                 .getContentAsString();
 
         CaseDecisionRequest decision = new CaseDecisionRequest();
-        decision.setDecision("APPROVED");
+        decision.setDecision("COMMUNICATE");
         decision.setJustification("Análise concluída sem indícios");
 
         // Extract case id from response would be needed in real scenario

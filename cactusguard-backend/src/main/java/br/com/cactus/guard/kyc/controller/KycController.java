@@ -40,8 +40,16 @@ public class KycController {
     @GetMapping
     @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<Page<KycProcessResponse>> findByStatus(
-            @RequestParam(defaultValue = "IN_PROGRESS") String status,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) UUID partyId,
             Pageable pageable) {
+        // com partyId: todos os processos da parte (status opcional); sem partyId: fila por status (default IN_PROGRESS)
+        if (partyId != null) {
+            return ResponseEntity.ok(kycService.findByParty(partyId, status, pageable));
+        }
+        if (status == null || status.isBlank()) {
+            status = "IN_PROGRESS";
+        }
         return ResponseEntity.ok(kycService.findByStatus(status, pageable));
     }
 

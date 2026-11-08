@@ -12,6 +12,7 @@ import java.util.UUID;
 public interface KycProcessRepository extends JpaRepository<KycProcess, UUID> {
     Page<KycProcess> findByStatus(String status, Pageable pageable);
     Page<KycProcess> findByPartyId(UUID partyId, Pageable pageable);
+    Page<KycProcess> findByPartyIdAndStatus(UUID partyId, String status, Pageable pageable);
     Optional<KycProcess> findFirstByPartyIdAndStatusOrderByCreatedAtDesc(UUID partyId, String status);
     List<KycProcess> findByStatusAndExpiresAtBefore(String status, Instant now);
 

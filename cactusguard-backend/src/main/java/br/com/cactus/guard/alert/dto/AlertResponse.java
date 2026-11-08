@@ -12,6 +12,8 @@ public class AlertResponse {
     private UUID id;
     private UUID partyId;
     private String partyName;
+    /** Documento da parte sempre mascarado. */
+    private String partyDocument;
     private String type;
     private String severity;
     private String status;

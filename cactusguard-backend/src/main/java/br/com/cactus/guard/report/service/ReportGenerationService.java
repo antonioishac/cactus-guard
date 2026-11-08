@@ -51,7 +51,7 @@ public class ReportGenerationService {
         } catch (Exception e) {
             log.error("Report generation failed", e);
             job.setStatus("FAILED");
-            job.setErrorMessage(e.getMessage());
+            job.setErrorMessage("Falha na geracao do relatorio (job " + job.getId() + "); detalhes no log do servidor");
             job.setCompletedAt(Instant.now());
             jobRepository.save(job);
         }

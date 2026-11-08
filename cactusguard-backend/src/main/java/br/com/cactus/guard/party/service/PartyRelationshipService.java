@@ -3,6 +3,7 @@ package br.com.cactus.guard.party.service;
 import br.com.cactus.guard.audit.service.DataAccessService;
 
 import br.com.cactus.guard.common.exception.BusinessException;
+import br.com.cactus.guard.party.dto.PartyRelationshipResponse;
 import br.com.cactus.guard.party.entity.Party;
 import br.com.cactus.guard.party.entity.PartyRelationship;
 import br.com.cactus.guard.party.repository.PartyRelationshipRepository;
@@ -39,9 +40,15 @@ public class PartyRelationshipService {
         return repository.save(rel);
     }
 
-    public List<PartyRelationship> findByParty(UUID partyId) {
+    @Transactional
+    public PartyRelationshipResponse addResponse(UUID partyId, UUID relatedPartyId, String relationshipType, String description) {
+        return PartyRelationshipResponse.from(add(partyId, relatedPartyId, relationshipType, description));
+    }
+
+    @Transactional(readOnly = true)
+    public List<PartyRelationshipResponse> findByParty(UUID partyId) {
         dataAccessService.log("PARTY_RELATIONSHIP", partyId, "relationshipType,relatedParty", "CONSULTA", null);
-        return repository.findByPartyIdAndActiveTrue(partyId);
+        return repository.findByPartyIdAndActiveTrue(partyId).stream().map(PartyRelationshipResponse::from).toList();
     }
 
     @Transactional

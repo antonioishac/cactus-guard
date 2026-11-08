@@ -28,7 +28,8 @@ public class BeneficialOwner {
     @JoinColumn(name = "party_id", nullable = false)
     private Party party;
 
-    // Coluna alargada para VARCHAR(512) em V21 (permite criptografia futura).
+    // PII cifrada (AES-256-GCM, IV aleatorio): busca somente por owner_document_hash (HMAC, DocumentHash).
+    @Convert(converter = br.com.cactus.guard.crypto.EncryptedStringConverter.class)
     @Column(name = "owner_document", nullable = false, length = 512)
     private String ownerDocument;
 

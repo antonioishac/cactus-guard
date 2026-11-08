@@ -1,5 +1,6 @@
 package br.com.cactus.guard.siscoaf.service;
 
+import br.com.cactus.guard.common.audit.AuditPayload;
 import br.com.cactus.guard.audit.service.AuditService;
 import br.com.cactus.guard.common.calendar.BusinessCalendar;
 import br.com.cactus.guard.common.exception.BusinessException;
@@ -50,7 +51,7 @@ public class NegativeDeclarationService {
                 .createdBy(currentUser.user().orElse(null))
                 .build();
         decl = repository.save(decl);
-        auditService.log("NEGATIVE_DECLARATION_CREATED", "SISCOAF_COMMUNICATION", decl.getId(), null,
+        AuditPayload.log(auditService, "NEGATIVE_DECLARATION_CREATED", "SISCOAF_COMMUNICATION", decl.getId(), null,
                 Map.of("referenceYear", referenceYear));
         return decl;
     }

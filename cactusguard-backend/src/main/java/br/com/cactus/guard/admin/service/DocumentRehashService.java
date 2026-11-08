@@ -17,7 +17,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Pattern;
 
 /**
  * Reprocessa os hashes de documento apos a troca de SHA-256 puro por HMAC-SHA256 com pepper
@@ -32,7 +31,6 @@ import java.util.regex.Pattern;
 public class DocumentRehashService {
 
     private static final int PAGE_SIZE = 200;
-    private static final Pattern ENCRYPTED = Pattern.compile("^[A-Za-z0-9_-]{1,16}:[A-Za-z0-9+/=]+$");
 
     private final PartyRepository partyRepository;
     private final JdbcTemplate jdbc;
@@ -71,6 +69,22 @@ public class DocumentRehashService {
         return new Result(parties, owners, txs);
     }
 
+    /**
+     * Cifra documentos de UBO e de contraparte ainda em claro (dados anteriores a V30) e preenche o hash.
+     * Idempotente; chamado na inicializacao e por rehashAll.
+     */
+    @Transactional
+    public long encryptLegacyPlaintext() {
+        long owners = rehashColumn("beneficial_owners", "owner_document", "owner_document_hash");
+        long txs = rehashColumn("transactions", "counterparty_document", "counterparty_document_hash");
+        if (owners + txs > 0) {
+            auditService.log("PII_LEGACY_ENCRYPTED", "SYSTEM", null, null,
+                    Map.of("beneficialOwners", owners, "transactions", txs));
+            log.info("PII legada cifrada: beneficialOwners={}, transactions={}", owners, txs);
+        }
+        return owners + txs;
+    }
+
     /** Tabelas/colunas sao constantes internas (nunca entrada do usuario). */
     private long rehashColumn(String table, String docCol, String hashCol) {
         List<Map<String, Object>> rows = jdbc.queryForList(
@@ -78,13 +92,17 @@ public class DocumentRehashService {
         long updated = 0;
         for (Map<String, Object> row : rows) {
             String doc = String.valueOf(row.get("doc"));
-            // coluna pode estar cifrada (prefixo de versao) ou, em dados legados, em claro
-            if (ENCRYPTED.matcher(doc).matches() && doc.indexOf(':') > 0 && doc.length() > 24) {
-                doc = converter.convertToEntityAttribute(doc);
-            }
-            String h = DocumentHash.of(doc);
-            if (!h.equals(row.get("h"))) {
-                jdbc.update("UPDATE " + table + " SET " + hashCol + " = ? WHERE id = ?", h, (UUID) row.get("id"));
+            UUID id = (UUID) row.get("id");
+            // valor cifrado traz prefixo de versao ("v1:..."); sem ":" e dado legado em claro
+            boolean legacyPlain = !doc.contains(":");
+            String clear = legacyPlain ? doc : converter.convertToEntityAttribute(doc);
+            String h = DocumentHash.of(clear);
+            if (legacyPlain) {
+                jdbc.update("UPDATE " + table + " SET " + docCol + " = ?, " + hashCol + " = ? WHERE id = ?",
+                        converter.convertToDatabaseColumn(clear), h, id);
+                updated++;
+            } else if (!h.equals(row.get("h"))) {
+                jdbc.update("UPDATE " + table + " SET " + hashCol + " = ? WHERE id = ?", h, id);
                 updated++;
             }
         }

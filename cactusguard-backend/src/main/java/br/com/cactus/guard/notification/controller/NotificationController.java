@@ -33,6 +33,12 @@ public class NotificationController {
         return ResponseEntity.ok(Map.of("count", notificationService.countUnread()));
     }
 
+    @PostMapping("/read-all")
+    @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
+    public ResponseEntity<Map<String, Integer>> markAllAsRead() {
+        return ResponseEntity.ok(Map.of("updated", notificationService.markAllAsRead()));
+    }
+
     @PostMapping("/{id}/read")
     @PreAuthorize("hasAnyRole('ANALYST','SUPERVISOR','ADMIN','AUDITOR')")
     public ResponseEntity<Void> markAsRead(@PathVariable UUID id) {

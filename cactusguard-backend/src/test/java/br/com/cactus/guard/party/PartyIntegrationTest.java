@@ -26,7 +26,7 @@ class PartyIntegrationTest {
     private ObjectMapper objectMapper;
 
     @Test
-    @WithMockUser(roles = "ADMIN")
+    @WithMockUser(roles = "ANALYST")
     void createPartyShouldReturnCreated() throws Exception {
         PartyRequest request = new PartyRequest();
         request.setType("PF");
@@ -45,7 +45,7 @@ class PartyIntegrationTest {
     }
 
     @Test
-    @WithMockUser(roles = "ADMIN")
+    @WithMockUser(roles = "ANALYST")
     void createPartyWithDuplicateDocumentShouldFail() throws Exception {
         PartyRequest request = new PartyRequest();
         request.setType("PF");
