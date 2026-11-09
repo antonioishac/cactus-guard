@@ -1,30 +1,37 @@
 package br.com.cactus.guard.config;
 
-import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
+import br.com.cactus.guard.config.ratelimit.LocalRateLimiter;
+import br.com.cactus.guard.config.ratelimit.RateLimiter;
+import br.com.cactus.guard.config.ratelimit.RedisRateLimiter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Limitador de requisicoes. Backend {@code cactus.ratelimit.backend}: {@code redis} (padrao fora de teste; contadores
+ * compartilhados entre instancias, com contingencia local se o Redis cair) ou {@code memory} (por instancia; perfil de
+ * teste). Os limites por escopo ficam em {@link RateLimitFilter}/{@code cactus.ratelimit.*}.
+ */
 @Configuration
 public class RateLimitConfig {
 
-    private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
-
     @Bean
-    public Map<String, Bucket> rateLimitBuckets() {
-        buckets.put("login", createBucket(5, Duration.ofMinutes(1)));
-        buckets.put("search", createBucket(30, Duration.ofMinutes(1)));
-        buckets.put("default", createBucket(100, Duration.ofMinutes(1)));
-        return buckets;
+    public LocalRateLimiter localRateLimiter(@Value("${cactus.ratelimit.max-local-keys:200000}") int maxKeys) {
+        return new LocalRateLimiter(maxKeys);
     }
 
-    private Bucket createBucket(int capacity, Duration duration) {
-        return Bucket.builder()
-                .addLimit(Bandwidth.builder().capacity(capacity).refillGreedy(capacity, duration).build())
-                .build();
+    @Bean
+    @org.springframework.context.annotation.Primary
+    public RateLimiter rateLimiter(@Value("${cactus.ratelimit.backend:redis}") String backend,
+                                   LocalRateLimiter local, RedisConnectionFactory redisFactory,
+                                   @Value("${cactus.ratelimit.redis-retry-after-failure:30s}") Duration retryAfterFailure) {
+        if ("memory".equalsIgnoreCase(backend)) {
+            return local;
+        }
+        return new RedisRateLimiter(new StringRedisTemplate(redisFactory), local, retryAfterFailure);
     }
 }

@@ -253,13 +253,18 @@ class PartyContractsTest {
     @Test
     @WithMockUser(roles = "ANALYST")
     void errorBodyHasStableCodeAndTraceId() throws Exception {
-        mvc.perform(get("/api/v1/parties/" + UUID.randomUUID()).header("X-Trace-Id", "trace-abc-12345678"))
+        // traceId = traceId do OpenTelemetry (32 hex): o mesmo no header X-Trace-Id e no corpo de erro.
+        // Um X-Trace-Id enviado pelo cliente nao vira o traceId (fica no span como client.trace_id).
+        var result = mvc.perform(get("/api/v1/parties/" + UUID.randomUUID()).header("X-Trace-Id", "trace-abc-12345678"))
                 .andExpect(status().isNotFound())
-                .andExpect(header().string("X-Trace-Id", "trace-abc-12345678"))
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"))
-                .andExpect(jsonPath("$.traceId").value("trace-abc-12345678"))
                 .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.message").exists());
+                .andExpect(jsonPath("$.message").exists())
+                .andReturn();
+        String header = result.getResponse().getHeader("X-Trace-Id");
+        assertNotNull(header);
+        assertTrue(header.matches("[0-9a-f]{32}"), "traceId deve ser o do OpenTelemetry: " + header);
+        assertTrue(result.getResponse().getContentAsString().contains("\"traceId\":\"" + header + "\""));
     }
 
     @Test
@@ -270,7 +275,7 @@ class PartyContractsTest {
                 .andReturn();
         String header = result.getResponse().getHeader("X-Trace-Id");
         assertNotNull(header);
-        assertTrue(header.matches("[0-9a-f-]{36}"), "id invalido deve ser substituido por UUID");
+        assertTrue(header.matches("[0-9a-f]{32}"), "sem contexto valido, o traceId e gerado pelo tracer");
         assertTrue(result.getResponse().getContentAsString().contains(header));
     }
 

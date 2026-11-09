@@ -3,6 +3,8 @@ package br.com.cactus.guard.audit.controller;
 import org.springframework.security.access.prepost.PreAuthorize;
 import br.com.cactus.guard.audit.dto.AuditFilter;
 import br.com.cactus.guard.audit.dto.AuditLogResponse;
+import br.com.cactus.guard.audit.dto.AuditIntegrityResponse;
+import br.com.cactus.guard.audit.service.AuditIntegrityService;
 import br.com.cactus.guard.audit.service.AuditService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -21,6 +23,7 @@ import java.util.UUID;
 public class AuditController {
 
     private final AuditService auditService;
+    private final AuditIntegrityService integrityService;
 
     @GetMapping
     @PreAuthorize("hasAnyRole('AUDITOR','ADMIN','SUPERVISOR')")
@@ -47,5 +50,13 @@ public class AuditController {
             Pageable pageable) {
         AuditFilter filter = new AuditFilter(null, null, null, entityType, entityId, null, null);
         return ResponseEntity.ok(auditService.search(filter, pageable));
+    }
+
+    @GetMapping("/integrity")
+    @PreAuthorize("hasAnyRole('AUDITOR','ADMIN','SUPERVISOR')")
+    @Operation(summary = "Verifica a cadeia de hash da trilha de auditoria do tenant (recalcula no banco); "
+            + "retorna ok ou o primeiro registro divergente. Registros anteriores a V45 nao sao encadeados.")
+    public ResponseEntity<AuditIntegrityResponse> integrity() {
+        return ResponseEntity.ok(integrityService.verify());
     }
 }

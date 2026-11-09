@@ -4,11 +4,14 @@ import br.com.cactus.guard.event.config.EventProperties;
 import br.com.cactus.guard.event.dto.DomainEventType;
 import br.com.cactus.guard.event.entity.OutboxEvent;
 import br.com.cactus.guard.tenant.TenantContext;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,14 +28,25 @@ import java.util.UUID;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class DomainEventPublisher {
 
     public static final String HEADER_TENANT = "tenantId";
     public static final String HEADER_TRACE = "traceId";
     public static final String HEADER_EVENT_TYPE = "eventType";
 
+    /** Header do outbox com o contexto W3C do request que originou o evento (continuado pelo relay e pelo consumidor). */
+    public static final String HEADER_TRACEPARENT = "traceparent";
+
     private final EventProperties properties;
+    private final Tracer tracer;
+    private final Propagator propagator;
+
+    public DomainEventPublisher(EventProperties properties, ObjectProvider<Tracer> tracer,
+                                ObjectProvider<Propagator> propagator) {
+        this.properties = properties;
+        this.tracer = tracer.getIfAvailable();
+        this.propagator = propagator.getIfAvailable();
+    }
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -49,7 +63,8 @@ public class DomainEventPublisher {
         }
         PiiGuard.assertNoPii(data);
         UUID tenantId = TenantContext.require();
-        String traceId = MDC.get("traceId");
+        Span span = tracer != null ? tracer.currentSpan() : null;
+        String traceId = span != null ? span.context().traceId() : MDC.get("traceId");
         if (traceId == null || traceId.isBlank()) {
             traceId = UUID.randomUUID().toString();
         }
@@ -66,6 +81,9 @@ public class DomainEventPublisher {
         headers.put(HEADER_TENANT, tenantId.toString());
         headers.put(HEADER_TRACE, traceId);
         headers.put(HEADER_EVENT_TYPE, type.type());
+        if (span != null && propagator != null) {
+            propagator.inject(span.context(), headers, (carrier, key, value) -> carrier.put(key, value));
+        }
         e.setHeaders(headers);
         e.setOccurredAt(now);
         e.setNextAttemptAt(now);

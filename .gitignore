@@ -18,13 +18,21 @@ node_modules/
 
 # Logs
 *.log
-logs/
+/logs/
+cactusguard-backend/logs/
 
-# Arquivos gerados em runtime (podem conter PII/dados de PLD)
-# Relatórios PDF/Excel: ReportGenerationService/ExcelReportService gravam em Path.of("reports")
-reports/
-uploads/
-storage/
+# Arquivos gerados em runtime (podem conter PII/dados de PLD) — SEMPRE ancorados:
+# um padrão solto como "reports/" ignorava cactusguard-web/src/features/reports (código-fonte!).
+# Relatórios PDF/Excel (Path.of("reports")) e evidências de case (cases.evidence.dir = data/case-evidences)
+# são gravados relativos ao diretório de execução: raiz do repo ou cactusguard-backend/.
+/reports/
+/data/
+/uploads/
+/storage/
+cactusguard-backend/reports/
+cactusguard-backend/data/
+cactusguard-backend/uploads/
+cactusguard-backend/storage/
 
 # Flutter (cactusguard-mobile)
 cactusguard-mobile/build/

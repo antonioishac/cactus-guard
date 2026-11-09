@@ -71,6 +71,7 @@ public final class TenantContext {
         }
         CURRENT.set(tenantId);
         MDC.put(MDC_KEY, tenantId.toString());
+        br.com.cactus.guard.observability.TenantTracing.onTenant(tenantId);
     }
 
     public static void clear() {

@@ -24,6 +24,7 @@ Usar **AES-256-GCM** com chave gerenciada externamente (AWS KMS, Azure Key Vault
 - Campo criptografado armazenado como `bytea` ou `text` (base64).
 - Chave de criptografia rotacionada a cada 90 dias.
 - Índice de busca por hash (não pelo valor criptografado).
+- **Hash de documento por tenant**: `document_hash` = HMAC-SHA256 com chave derivada por HKDF-SHA256 de `DOCUMENT_HASH_KEY` + `tenant:<id>` (`DocumentHash.of` usa o tenant do contexto; sem tenant = exceção). O mesmo CPF gera hashes distintos em tenants distintos (sem correlação entre clientes em caso de vazamento). Versão em `tenants.hash_version` (1 = pepper global legado, 2 = por tenant); migração automática única na subida e `POST /api/v1/admin/rehash-documents` recalcula o tenant do chamador (também após rotação do segredo mestre).
 
 ### Implementação
 

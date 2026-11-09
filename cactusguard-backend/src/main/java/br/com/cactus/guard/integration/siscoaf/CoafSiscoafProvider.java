@@ -21,8 +21,11 @@ public class CoafSiscoafProvider implements SiscoafProviderPort {
 
     public CoafSiscoafProvider(
             @Value("${integrations.siscoaf.base-url}") String baseUrl,
-            @Value("${integrations.siscoaf.certificate-path:}") String certPath) {
+            @Value("${integrations.siscoaf.certificate-path:}") String certPath,
+            io.micrometer.observation.ObservationRegistry observationRegistry) {
         this.restClient = RestClient.builder()
+                // span http.client.requests (tracing + metricas) para a chamada externa; propaga traceparent
+                .observationRegistry(observationRegistry)
                 .baseUrl(baseUrl)
                 .defaultHeader("Content-Type", "application/xml")
                 .build();

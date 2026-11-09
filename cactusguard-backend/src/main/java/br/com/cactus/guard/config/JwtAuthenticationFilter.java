@@ -57,6 +57,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
                 TenantContext.set(tenantId);
                 tenantBound = true;
+                // tenant.id tambem no span HTTP raiz (a observacao e encerrada depois que o contexto do tenant e limpo)
+                org.springframework.web.filter.ServerHttpObservationFilter.findObservationContext(request).ifPresent(ctx ->
+                        ctx.addHighCardinalityKeyValue(io.micrometer.common.KeyValue.of("tenant.id", tenantId.toString())));
                 try {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
                     if (userDetails.isEnabled()) {

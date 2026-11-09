@@ -65,6 +65,11 @@ public class Tenant {
     @Builder.Default
     private Map<String, Object> settings = new HashMap<>();
 
+    /** 1 = hashes de documento com pepper global (legado); 2 = pepper por tenant (HKDF). Ver DocumentHashMigrationRunner. */
+    @Column(name = "hash_version", nullable = false)
+    @Builder.Default
+    private int hashVersion = 2;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

@@ -9,8 +9,12 @@ import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.tracing.Span;
+import io.micrometer.tracing.Tracer;
+import io.micrometer.tracing.propagation.Propagator;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
@@ -76,10 +80,15 @@ public class OutboxRelay {
     private final CircuitBreaker breaker;
     private final Counter published;
     private final Counter failed;
+    private final Tracer tracer;
+    private final Propagator propagator;
 
     public OutboxRelay(JdbcTemplate jdbc, PlatformTransactionManager txManager, KafkaTemplate<String, String> kafka,
                        ObjectMapper mapper, EventProperties props, TenantRunner tenantRunner,
-                       CircuitBreakerRegistry breakers, MeterRegistry meters) {
+                       CircuitBreakerRegistry breakers, MeterRegistry meters,
+                       ObjectProvider<Tracer> tracer, ObjectProvider<Propagator> propagator) {
+        this.tracer = tracer.getIfAvailable();
+        this.propagator = propagator.getIfAvailable();
         this.jdbc = jdbc;
         this.tx = new TransactionTemplate(txManager);
         this.kafka = kafka;
@@ -144,7 +153,7 @@ public class OutboxRelay {
 
         for (Row row : rows) {
             try {
-                futures.add(kafka.send(toRecord(tenantId, row)));
+                futures.add(sendInOriginTrace(tenantId, row));
                 sent.add(row);
             } catch (RuntimeException e) {
                 // broker/metadata indisponivel: nao insiste nas demais; elas ficam intactas para o proximo ciclo
@@ -188,6 +197,33 @@ public class OutboxRelay {
         }
         breaker.onError(elapsed, TimeUnit.NANOSECONDS, failures.get(0).error());
         return 0; // em falha, nao repete o laco no mesmo ciclo
+    }
+
+    /**
+     * Envia dentro de um span {@code outbox.relay} filho do contexto W3C gravado no outbox: o span do producer Kafka
+     * (e portanto o do consumidor) entra no MESMO trace do request HTTP que gerou o evento, mesmo o envio acontecendo
+     * em outra thread/instancia, depois do commit.
+     */
+    @SuppressWarnings("unchecked")
+    private CompletableFuture<SendResult<String, String>> sendInOriginTrace(UUID tenantId, Row row) {
+        if (tracer == null || propagator == null) {
+            return kafka.send(toRecord(tenantId, row));
+        }
+        Map<String, Object> headers = row.headers() == null ? Map.of() : mapper.readValue(row.headers(), Map.class);
+        Span span = propagator.<Map<String, Object>>extract(headers,
+                (carrier, key) -> carrier.get(key) instanceof String s ? s : null)
+                .name("outbox.relay")
+                .tag("tenant.id", tenantId.toString())
+                .tag("event.type", row.eventType())
+                .start();
+        try (Tracer.SpanInScope ignored = tracer.withSpan(span)) {
+            return kafka.send(toRecord(tenantId, row));
+        } catch (RuntimeException e) {
+            span.error(e);
+            throw e;
+        } finally {
+            span.end();
+        }
     }
 
     @SuppressWarnings("unchecked")

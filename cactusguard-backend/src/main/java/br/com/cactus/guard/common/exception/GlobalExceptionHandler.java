@@ -60,6 +60,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message, fields);
     }
 
+    @ExceptionHandler(br.com.cactus.guard.auth.service.LoginBlockedException.class)
+    public ResponseEntity<Map<String, Object>> handleLoginBlocked(br.com.cactus.guard.auth.service.LoginBlockedException ex) {
+        return buildResponse(HttpStatus.TOO_MANY_REQUESTS, "LOGIN_TEMPORARILY_BLOCKED", ex.getMessage(), null);
+    }
+
     // Sem estes handlers o catch-all abaixo transformava credencial invalida e @PreAuthorize negado em 500
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<Map<String, Object>> handleAuthentication(AuthenticationException ex) {

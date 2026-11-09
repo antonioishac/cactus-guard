@@ -32,6 +32,7 @@ Leia sob demanda: só a spec da tarefa. Em conflito, vale a interpretação regu
 | Arquivo | Conteúdo |
 |---|---|
 | 048-estrategia-competitiva-roadmap.md | **Norteadora**: posicionamento FRAML, lacunas, arquitetura-alvo e roadmap por fases |
+| 049-motor-decisao-unificado.md | Fase 2 (proposta): Decision API, feature store, DSL de regras, backtesting/shadow, trilhas de implementação |
 | 047-padroes-tecnicos-backend.md | Java 25 / Spring Boot 4.x, pacotes, hexagonal seletivo, Kafka, multi-tenancy, FTS |
 | 005-arquitetura-tecnica.md | Arquitetura técnica geral |
 | 006-roadmap.md | Roadmap e fases |
@@ -68,7 +69,7 @@ Leia sob demanda: só a spec da tarefa. Em conflito, vale a interpretação regu
 | ../specs-frontend/044-layout-navegacao.md | Layout e navegação |
 | ../specs-frontend/045-dashboard.md | Dashboard (implementação) |
 
-Próximo número livre: **048**. Não reutilize números; renumere com `git mv` e atualize referências.
+Próximo número livre: **050**. Não reutilize números; renumere com `git mv` e atualize referências.
 
 ## Status de implementação vs specs
 
@@ -77,7 +78,7 @@ Decisões das specs que **ainda não existem no código** (bloqueiam comercializ
 | Item | Spec | Status |
 |---|---|---|
 | Multi-tenancy (`tenant_id` + `@TenantId` Hibernate + RLS) | 047, 015, 002 | **Implementado** (V33–V38; `TenantIsolationIT`) — ver 047 para papéis de banco em produção e riscos residuais |
-| Eventos de domínio em Kafka (DLQ, retry, reprocesso) | 047 | Pendente — sem Kafka no código |
+| Eventos de domínio em Kafka (outbox, DLQ, retry, reprocesso) | 047 | Implementado (Fase 1b) — ver 047 seção Eventos |
 | Retenção de 10 anos | 003 | **Divergente** — `job/DataRetentionJob` apaga AuditLog/DataAccessLog após 5 anos (deveria ser ≥ 10 e não apagar trilha de auditoria) |
 | Decisão `COMMUNICATE \| ARCHIVE` + `/escalate` + `/approve` | 033, 012 | Pendente — código aceita `APPROVED/REJECTED/ESCALATED` |
 | Quatro olhos (PEP / alto risco / EDD / ativação de regra) | 012, 017 | Pendente |

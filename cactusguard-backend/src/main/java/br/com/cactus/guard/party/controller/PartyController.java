@@ -86,7 +86,7 @@ public class PartyController {
                                                  HttpServletRequest http) {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
-                .body(partyService.reveal(id, request, http.getRemoteAddr()));
+                .body(partyService.reveal(id, request, br.com.cactus.guard.config.ClientIpFilter.ipOf(http)));
     }
 
     @PostMapping("/{id}/risk/recalculate")

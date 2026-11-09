@@ -20,8 +20,11 @@ public class SerproKycProvider implements KycProviderPort {
 
     public SerproKycProvider(
             @Value("${integrations.kyc.base-url}") String baseUrl,
-            @Value("${integrations.kyc.api-key}") String apiKey) {
+            @Value("${integrations.kyc.api-key}") String apiKey,
+            io.micrometer.observation.ObservationRegistry observationRegistry) {
         this.restClient = RestClient.builder()
+                // span http.client.requests (tracing + metricas) para a chamada externa; propaga traceparent
+                .observationRegistry(observationRegistry)
                 .baseUrl(baseUrl)
                 .defaultHeader("Authorization", "Bearer " + apiKey)
                 .defaultHeader("Content-Type", "application/json")

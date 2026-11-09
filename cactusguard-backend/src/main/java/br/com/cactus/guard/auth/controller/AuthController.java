@@ -17,8 +17,9 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ResponseEntity.ok(authService.login(request));
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
+                                              jakarta.servlet.http.HttpServletRequest http) {
+        return ResponseEntity.ok(authService.login(request, br.com.cactus.guard.securityevent.dto.ClientInfo.from(http)));
     }
 
     @PostMapping("/refresh")

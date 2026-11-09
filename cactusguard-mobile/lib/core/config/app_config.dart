@@ -27,7 +27,7 @@ class AppConfig {
   static const _idleMin = int.fromEnvironment('IDLE_TIMEOUT_MIN', defaultValue: 15);
   static const _lockSec = int.fromEnvironment('BIOMETRIC_LOCK_SECONDS', defaultValue: 30);
   static const _push = String.fromEnvironment('PUSH_MODE', defaultValue: 'noop');
-  static const _version = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.0');
+  static const _version = String.fromEnvironment('APP_VERSION', defaultValue: '0.5.0');
 
   factory AppConfig.fromEnvironment() => AppConfig(
         apiUrl: _apiUrl,

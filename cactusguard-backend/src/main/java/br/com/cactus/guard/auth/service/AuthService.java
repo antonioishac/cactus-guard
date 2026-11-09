@@ -3,6 +3,8 @@ package br.com.cactus.guard.auth.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import br.com.cactus.guard.tenant.TenantContext;
+import br.com.cactus.guard.securityevent.dto.ClientInfo;
+import br.com.cactus.guard.securityevent.service.LoginGuard;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 
@@ -51,6 +53,10 @@ public class AuthService {
     private final br.com.cactus.guard.tenant.service.TenantDirectory tenantDirectory;
     private final br.com.cactus.guard.tenant.service.TenantAccessService tenantAccess;
     private final org.springframework.transaction.support.TransactionTemplate tx;
+    private final LoginGuard loginGuard;
+
+    /** Hash bcrypt descartavel: igualar o tempo de resposta de usuario inexistente ao de senha errada. */
+    private static final String DUMMY_HASH = "$2a$10$7EqJtq98hPqEX7fNZaFWoOa5pYhRYb1OZQh1x3rTn0X5c5U9R1v2e";
 
     @Value("${jwt.refresh-token-expiration}")
     private long refreshTokenExpiration;
@@ -60,32 +66,47 @@ public class AuthService {
      * O tenant e descoberto pelo username (globalmente unico) e todo o restante roda dentro dele.
      */
     public AuthResponse login(LoginRequest request) {
-        UUID tenantId = tenantDirectory.findTenantIdByUsername(request.getUsername()).orElse(null);
-        if (tenantId == null) {
-            // usuario inexistente: mesma excecao de credencial invalida (sem tenant nao ha onde auditar)
-            log.warn("Login negado: usuario desconhecido");
-            throw new BadCredentialsException("Credenciais invalidas");
-        }
-        return TenantContext.callAs(tenantId, () -> loginInTenant(request, tenantId));
+        return login(request, ClientInfo.UNKNOWN);
     }
 
-    private AuthResponse loginInTenant(LoginRequest request, UUID tenantId) {
+    public AuthResponse login(LoginRequest request, ClientInfo client) {
+        String username = request.getUsername();
+        // bloqueio temporario (usuario ou IP): resposta identica para usuario existente e inexistente
+        if (loginGuard.isBlocked(username, client)) {
+            loginGuard.recordBlocked(username, client);
+            throw new LoginBlockedException();
+        }
+        UUID tenantId = tenantDirectory.findTenantIdByUsername(username).orElse(null);
+        if (tenantId == null) {
+            // usuario inexistente: mesma excecao de credencial invalida; custo de hash equalizado (anti-enumeracao por tempo)
+            passwordEncoder.matches(String.valueOf(request.getPassword()), DUMMY_HASH);
+            loginGuard.recordFailure(username, null, client);
+            log.warn("Login negado: usuario desconhecido");
+            throw new BadCredentialsException("Bad credentials"); // mesma mensagem do DaoAuthenticationProvider
+        }
+        return TenantContext.callAs(tenantId, () -> loginInTenant(request, tenantId, client));
+    }
+
+    private AuthResponse loginInTenant(LoginRequest request, UUID tenantId, ClientInfo client) {
         try {
             authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
         } catch (AuthenticationException e) {
             auditService.log("LOGIN_FAILURE", "USER", null, null, Map.of("username", request.getUsername()));
+            loginGuard.recordFailure(request.getUsername(), tenantId, client);
             throw e;
         }
         // Senha correta, mas tenant suspenso: 403 (so depois de autenticar, para nao revelar o estado a quem nao tem credencial)
         if (!tenantAccess.isActive(tenantId)) {
             auditService.log("LOGIN_DENIED_TENANT_SUSPENDED", "USER", null, null, Map.of("username", request.getUsername()));
+            loginGuard.recordTenantSuspended(request.getUsername(), tenantId, client);
             throw new AccessDeniedException("Tenant suspenso");
         }
 
         User user = userRepository.findByUsername(request.getUsername())
                 .orElseThrow(() -> new BusinessException("User not found"));
         auditService.log("LOGIN_SUCCESS", "USER", user.getId(), null, Map.of("username", user.getUsername()));
+        loginGuard.recordSuccess(request.getUsername(), tenantId, client);
         return issueTokens(user);
     }
 

@@ -4,7 +4,7 @@ Plataforma SaaS de Prevenção à Lavagem de Dinheiro e Financiamento do Terrori
 
 ## Stack e comandos
 - Backend `cactusguard-backend/`: Java 25, Spring Boot 4.x, PostgreSQL, Redis, Flyway, Resilience4j, JWT. Detalhes: `cactusguard-backend/CLAUDE.md`.
-  - Testes: `cd cactusguard-backend && JAVA_HOME=/c/Java/jdk-25.0.2 mvn test`
+  - Testes: `cd cactusguard-backend && JAVA_HOME=/c/Java/jdk-25.0.2 ./mvnw test` (`./mvnw verify` = + ITs PostgreSQL/Testcontainers, igual ao CI)
   - Um teste: `JAVA_HOME=/c/Java/jdk-25.0.2 mvn test -Dtest=NomeDoTest`
 - Web `cactusguard-web/`: React 19 + Vite + Tailwind 4 + TanStack Query + MSW. `npm run dev` (ou `dev:mock`) | `npm run typecheck` | `npm test -- --run` | `npm run build`. Detalhes: `cactusguard-web/CLAUDE.md`.
 - Mobile `cactusguard-mobile/`: Flutter + Riverpod + Dio + go_router (Android; pacote `br.com.cactus.guard.mobile`). `flutter analyze` | `flutter test`. Detalhes: `cactusguard-mobile/CLAUDE.md`.
@@ -24,8 +24,10 @@ Plataforma SaaS de Prevenção à Lavagem de Dinheiro e Financiamento do Terrori
 | Tarefa | Spec |
 |---|---|
 | **Prioridade, fase atual, arquitetura-alvo (PLD+FT+Fraude)** | **specs/048** |
+| CI/CD, cadeia de suprimentos, checks obrigatórios | docs/engenharia/ci-cd.md |
 | Prazos, COAF, retenção, CSNU | specs/003 |
 | Campos de entidade / migration nova | specs/046, specs/002 |
+| Motor de decisão / regras / features | specs/049 |
 | Regras e cenários | specs/008, 009, 013 |
 | Case, dossiê, aprovação | specs/012, 033 |
 | PEP / KYC / UBO | specs/017, 010 |

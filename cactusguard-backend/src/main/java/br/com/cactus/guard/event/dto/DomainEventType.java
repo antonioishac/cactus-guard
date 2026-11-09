@@ -16,7 +16,9 @@ public enum DomainEventType {
     COMMUNICATION_CREATED("cactus.communication.created", "COMMUNICATION", EventTopics.COMMUNICATIONS),
     COMMUNICATION_SUBMITTED("cactus.communication.submitted", "COMMUNICATION", EventTopics.COMMUNICATIONS),
     PARTY_RISK_CHANGED("cactus.party.risk-changed", "PARTY", EventTopics.PARTIES),
-    ASSET_FREEZE_ACTIVATED("cactus.party.asset-freeze-activated", "PARTY", EventTopics.PARTIES);
+    ASSET_FREEZE_ACTIVATED("cactus.party.asset-freeze-activated", "PARTY", EventTopics.PARTIES),
+    /** Ancora periodica da cabeca da cadeia de hash do audit_log do tenant (V45); so hash e sequencia, sem PII. */
+    AUDIT_ANCHOR("cactus.audit.anchor", "AUDIT_ANCHOR", EventTopics.AUDIT);
 
     private final String type;
     private final String aggregateType;

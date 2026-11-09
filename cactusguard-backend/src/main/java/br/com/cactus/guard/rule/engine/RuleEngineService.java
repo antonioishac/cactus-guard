@@ -4,6 +4,7 @@ import br.com.cactus.guard.alert.entity.Alert;
 import br.com.cactus.guard.alert.service.AlertCreationService;
 import br.com.cactus.guard.alert.service.AlertCreationService.AlertDraft;
 import br.com.cactus.guard.common.util.DocumentHash;
+import br.com.cactus.guard.metrics.BusinessMetrics;
 import br.com.cactus.guard.party.entity.Party;
 import br.com.cactus.guard.party.repository.PartyRepository;
 import br.com.cactus.guard.rule.entity.MonitoringRule;
@@ -54,6 +55,7 @@ public class RuleEngineService {
     private final HighRiskJurisdictionRepository jurisdictionRepository;
     private final AlertCreationService alertCreation;
     private final CashCommunicationService cashCommunication;
+    private final BusinessMetrics metrics;
 
     /** Cenarios guiados por transacao: unicos avaliados no monitoramento por evento (os demais seguem em batch). */
     static final Set<String> TRANSACTIONAL_RULES = Set.of("TXN_HIGH_VALUE", "TXN_VELOCITY", "STRUCTURING",
@@ -77,6 +79,18 @@ public class RuleEngineService {
      */
     @Transactional
     public int evaluateForTransaction(UUID transactionId) {
+        long start = System.nanoTime();
+        boolean ok = false;
+        try {
+            int generated = doEvaluateForTransaction(transactionId);
+            ok = true;
+            return generated;
+        } finally {
+            metrics.transactionEvaluated(java.time.Duration.ofNanos(System.nanoTime() - start), ok);
+        }
+    }
+
+    private int doEvaluateForTransaction(UUID transactionId) {
         Transaction txn = transactionRepository.findById(transactionId)
                 .orElseThrow(() -> new IllegalArgumentException("Transaction not found: " + transactionId));
         UUID partyId = txn.getParty().getId();

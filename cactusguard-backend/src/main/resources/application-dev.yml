@@ -37,3 +37,7 @@ server:
 logging:
   level:
     br.com.cactus.guard: DEBUG
+management:
+  tracing:
+    sampling:
+      probability: ${CACTUS_OTEL_SAMPLING:1.0}

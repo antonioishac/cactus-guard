@@ -1,0 +1,10 @@
+# Perfil de producao: logs JSON estruturados (ECS) com trace.id/span.id e MDC (tenantId, traceId).
+# Variaveis de ambiente continuam sendo a unica fonte de segredos (ver application.yml).
+logging:
+  structured:
+    format:
+      console: ${CACTUS_LOG_FORMAT:ecs}   # ecs | logstash | gelf
+    ecs:
+      service:
+        name: cactusguard
+        environment: ${CACTUS_ENV:prod}

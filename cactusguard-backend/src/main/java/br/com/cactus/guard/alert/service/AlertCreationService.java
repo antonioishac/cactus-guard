@@ -39,6 +39,7 @@ public class AlertCreationService {
     private final RegulatoryDeadlines deadlines;
     private final ApplicationEventPublisher eventPublisher;
     private final DomainEventPublisher events;
+    private final br.com.cactus.guard.metrics.BusinessMetrics metrics;
 
     /** Dados de um alerta a ser criado. */
     public record AlertDraft(Party party,
@@ -92,6 +93,7 @@ public class AlertCreationService {
                 .selectionDeadline(deadlines.selectionDeadline(occurredAt))
                 .build();
         alert = alertRepository.save(alert);
+        metrics.alertCreated(alert.getSeverity(), alert.getRuleCode());
         events.publish(DomainEventType.ALERT_CREATED, alert.getId(), EventPayloads.alertCreated(alert));
         if ("CRITICAL".equals(alert.getSeverity())) {
             eventPublisher.publishEvent(new CriticalAlertCreatedEvent(alert.getId(), br.com.cactus.guard.tenant.TenantContext.require()));

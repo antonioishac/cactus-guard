@@ -17,10 +17,11 @@ public final class EventTopics {
     public static final String CASES = "cactus.cases.v1";
     public static final String PARTIES = "cactus.parties.v1";
     public static final String COMMUNICATIONS = "cactus.communications.v1";
+    public static final String AUDIT = "cactus.audit.v1";
 
     public static final String DLQ_SUFFIX = ".dlq";
 
-    public static final List<String> ALL = List.of(TRANSACTIONS, ALERTS, CASES, PARTIES, COMMUNICATIONS);
+    public static final List<String> ALL = List.of(TRANSACTIONS, ALERTS, CASES, PARTIES, COMMUNICATIONS, AUDIT);
 
     private EventTopics() {
     }

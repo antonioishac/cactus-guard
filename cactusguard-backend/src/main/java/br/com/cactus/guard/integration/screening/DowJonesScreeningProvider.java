@@ -23,8 +23,11 @@ public class DowJonesScreeningProvider implements ScreeningProviderPort {
 
     public DowJonesScreeningProvider(
             @Value("${integrations.screening.base-url}") String baseUrl,
-            @Value("${integrations.screening.api-key}") String apiKey) {
+            @Value("${integrations.screening.api-key}") String apiKey,
+            io.micrometer.observation.ObservationRegistry observationRegistry) {
         this.restClient = RestClient.builder()
+                // span http.client.requests (tracing + metricas) para a chamada externa; propaga traceparent
+                .observationRegistry(observationRegistry)
                 .baseUrl(baseUrl)
                 .defaultHeader("Authorization", "Bearer " + apiKey)
                 .defaultHeader("Content-Type", "application/json")

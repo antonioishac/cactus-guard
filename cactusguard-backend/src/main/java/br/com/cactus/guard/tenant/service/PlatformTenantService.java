@@ -52,7 +52,7 @@ public class PlatformTenantService {
 
     /** Sem @Transactional: cada etapa tem a sua transacao (a troca de tenant exige nova sessao/conexao). */
     public TenantProvisionedResponse provision(TenantCreateRequest req) {
-        String cnpjHash = DocumentHash.of(req.cnpj());
+        String cnpjHash = DocumentHash.ofPlatform(req.cnpj());
         if (tenantRepository.existsByCode(req.code())) {
             throw new BusinessException("TENANT_CODE_IN_USE", "Ja existe um tenant com este codigo");
         }

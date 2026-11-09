@@ -35,6 +35,9 @@ spring:
       # Dev: container "cactusguard-redis" do docker-compose.yml da raiz do projeto.
       host: ${CACTUS_REDIS_HOST:127.0.0.1}
       port: ${CACTUS_REDIS_PORT:6379}
+      # timeouts curtos: Redis fora nao pode travar requisicoes (cache/rate limit tem contingencia)
+      timeout: 500ms
+      connect-timeout: 1s
   kafka:
     # Dev: cluster KRaft de 3 nos (portas do host). 127.0.0.1, nunca "localhost" (IPv6 ::1 atendido por outro servico).
     bootstrap-servers: ${CACTUS_KAFKA_BOOTSTRAP:127.0.0.1:19092,127.0.0.1:29092,127.0.0.1:39092}
@@ -56,6 +59,8 @@ spring:
         request.timeout.ms: 4000
         delivery.timeout.ms: 9000
         linger.ms: 5
+        # lz4 (lz4-java fixado no pom por CVE); os ITs exercitam a compressao
+        compression.type: lz4
     consumer:
       group-id: ${CACTUS_KAFKA_GROUP_ID:cactus-monitoring}
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
@@ -66,8 +71,38 @@ spring:
         isolation.level: read_committed
     listener:
       ack-mode: record
+      # Tracing: span do consumidor com contexto W3C (traceparent) lido do header da mensagem
+      observation-enabled: true
+    template:
+      # Tracing: span do producer + injecao de traceparent no header
+      observation-enabled: true
 
 cactus:
+  network:
+    trusted-proxies: ${CACTUS_TRUSTED_PROXIES:}
+  ratelimit:
+    # redis = contadores compartilhados entre instancias (contingencia local se o Redis cair); memory = por instancia
+    backend: ${CACTUS_RATELIMIT_BACKEND:redis}
+    login-per-ip: ${CACTUS_RATELIMIT_LOGIN_PER_IP:10}
+    search-per-user: ${CACTUS_RATELIMIT_SEARCH_PER_USER:30}
+    api-per-user: ${CACTUS_RATELIMIT_API_PER_USER:100}
+    api-per-tenant: ${CACTUS_RATELIMIT_API_PER_TENANT:3000}
+    api-per-ip: ${CACTUS_RATELIMIT_API_PER_IP:1000}
+  audit:
+    chain:
+      jobs-enabled: ${CACTUS_AUDIT_CHAIN_JOBS_ENABLED:true}
+      verify-cron: "0 30 3 * * *"   # diario 03:30
+      anchor-cron: "0 5 * * * *"    # de hora em hora, minuto 5
+  metrics:
+    # Metricas operacionais por tenant (casos por status, DLQ): snapshot periodico por tenant (RLS)
+    operational:
+      enabled: ${CACTUS_METRICS_OPERATIONAL_ENABLED:true}
+      refresh-interval: 30s
+    # Tag `tenant` nas metricas de negocio: DESLIGADA por padrao (cardinalidade). Ligada, limita a N tenants distintos;
+    # os demais agregam em tenant="other". Ver spec 038.
+    tenant-tag:
+      enabled: ${CACTUS_METRICS_TENANT_TAG:false}
+      max-tenants: ${CACTUS_METRICS_TENANT_TAG_MAX:50}
   events:
     # Chave mestra dos eventos de dominio (outbox + relay + topicos + consumidores). Perfil test: false.
     enabled: ${CACTUS_EVENTS_ENABLED:true}
@@ -88,6 +123,9 @@ cactus:
 
 server:
   port: 8080
+  # NENHUMA camada confia em X-Forwarded-* por conta propria: o IP real e resolvido por ClientIpResolver, que so aceita
+  # o cabecalho de proxies listados em CACTUS_TRUSTED_PROXIES (IPs/CIDRs separados por virgula; vazio = nenhum).
+  forward-headers-strategy: none
   error:
     include-stacktrace: never
     include-message: never
@@ -115,6 +153,12 @@ security:
     legacy-key: ${ENCRYPTION_LEGACY_KEY:${ENCRYPTION_KEY:}}
   document-hash:
     key: ${DOCUMENT_HASH_KEY:}
+  # Bloqueio progressivo de login (spec 047): N falhas por usuario na janela => bloqueio temporario; limite por IP.
+  login-protection:
+    max-failures-per-user: ${LOGIN_MAX_FAILURES_PER_USER:5}
+    max-failures-per-ip: ${LOGIN_MAX_FAILURES_PER_IP:20}
+    window-minutes: ${LOGIN_FAILURE_WINDOW_MINUTES:15}
+    lockout-minutes: ${LOGIN_LOCKOUT_MINUTES:15}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
   hsts:
@@ -148,6 +192,37 @@ management:
   metrics:
     tags:
       application: cactusguard
+  # OpenTelemetry (spec 038). Exportacao OTLP DESLIGADA por padrao: o traceId/spanId continuam gerados (logs, header
+  # X-Trace-Id, outbox, Kafka), so nao ha envio. Para exportar: CACTUS_OTEL_ENABLED=true e CACTUS_OTEL_ENDPOINT=<coletor>
+  # (ex.: http://otel-collector:4318). Sampling: CACTUS_OTEL_SAMPLING (0.0 a 1.0; prod padrao 0.1, dev 1.0).
+  tracing:
+    sampling:
+      probability: ${CACTUS_OTEL_SAMPLING:0.1}
+    export:
+      enabled: ${CACTUS_OTEL_ENABLED:false}
+    # Baggage nao carrega PII: so ids tecnicos
+    baggage:
+      correlation:
+        enabled: false
+  opentelemetry:
+    resource-attributes:
+      service.name: cactusguard
+      deployment.environment.name: ${CACTUS_ENV:dev}
+    tracing:
+      export:
+        otlp:
+          endpoint: ${CACTUS_OTEL_ENDPOINT:http://127.0.0.1:4318}/v1/traces
+  otlp:
+    metrics:
+      export:
+        enabled: ${CACTUS_OTEL_METRICS_ENABLED:false}
+        url: ${CACTUS_OTEL_ENDPOINT:http://127.0.0.1:4318}/v1/metrics
+        step: 30s
+  # Logs ja saem correlacionados (traceId/spanId/tenantId) no stdout (JSON em prod); sem exportador OTLP de logs.
+  logging:
+    export:
+      otlp:
+        enabled: false
 
 resilience4j:
   circuitbreaker:
@@ -167,6 +242,8 @@ resilience4j:
         wait-duration-in-open-state: 30s
       # Broker Kafka do relay do outbox: aberto, o relay pula o ciclo (eventos ficam no outbox)
       kafka-outbox:
+        # sem isto o breaker so sairia de OPEN quando alguem pedisse permissao (o relay pula o ciclo em OPEN)
+        automatic-transition-from-open-to-half-open-enabled: true
         sliding-window-size: 5
         minimum-number-of-calls: 2
         failure-rate-threshold: 50
@@ -200,7 +277,7 @@ integrations:
 
 logging:
   pattern:
-    level: "%5p [%X{traceId:-}] [tenant=%X{tenantId:-}]"
+    level: "%5p [%X{traceId:-},%X{spanId:-}] [tenant=%X{tenantId:-}]"
   level:
     org.springframework.security: INFO
     br.com.cactus.guard: INFO

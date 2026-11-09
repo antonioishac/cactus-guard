@@ -30,7 +30,8 @@ keywords = ["password", "passwd", "secret", "token", "api-key", "apikey", "priva
 [[rules]]
 id = "yaml-literal-credential"
 description = "Credencial literal em YAML/properties de configuração (deveria vir de variável de ambiente/cofre)"
-regex = '''(?im)^\s*(?:password|secret|legacy-key|key|keys|pepper|token|api-key)\s*[:=]\s*['"]?([^\s'"$#{][^\s'"#]{11,})'''
+# Valor não pode conter "$" nem "{": placeholders Spring ${VAR} e expressões de workflow ${{ }} não são segredo.
+regex = '''(?im)^\s*(?:password|secret|legacy-key|key|keys|pepper|token|api-key)\s*[:=]\s*['"]?([^\s'"$#{][^\s'"#${]{11,})'''
 secretGroup = 1
 path = '''(?i)\.(?:ya?ml|properties)$'''
 keywords = ["password", "secret", "key", "pepper", "token"]
@@ -78,6 +79,13 @@ regexes = [
   '''^\$2a\$10\$tDiz5O/hpBGShV9Xs050seN1ja5bQ7rCybrp6jBHqc23qJ9B//LYK$''',
   '''^\$2a\$10\$0LsAOBlZk52B4/ZDgD7U1eMAqpISRFRfFK1\.5r0v5gluXOeXsBngu$''',
 ]
+
+[[allowlists]]
+description = "CÓDIGO: hash BCrypt descartável (DUMMY_HASH) usado só para igualar o tempo de resposta de usuário inexistente (anti-enumeração). Não corresponde a nenhuma conta."
+condition = "AND"
+targetRules = ["bcrypt-hash"]
+paths = ['''(?:^|/)cactusguard-backend/src/main/java/br/com/cactus/guard/auth/service/AuthService\.java$''']
+regexes = ['''^\$2a\$10\$7EqJtq98hPqEX7fNZaFWoOa5pYhRYb1OZQh1x3rTn0X5c5U9R1v2e$''']
 
 [[allowlists]]
 description = "TESTE: segredos fixos do perfil 'test' (H2/Testcontainers). Só existem no classpath de teste."

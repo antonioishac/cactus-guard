@@ -38,8 +38,11 @@ public class TransactionMonitoringConsumer {
             autoStartup = "${cactus.events.consumer.enabled:true}")
     public void onMessage(ConsumerRecord<String, String> record) {
         String traceId = header(record, DomainEventPublisher.HEADER_TRACE);
+        // Com observacao do Kafka ligada, o MDC traceId ja vem do span do consumidor (mesmo trace do producer);
+        // o header so e usado como fallback (e removido so se foi este metodo que o definiu).
+        boolean setMdc = traceId != null && MDC.get("traceId") == null;
         try {
-            if (traceId != null) {
+            if (setMdc) {
                 MDC.put("traceId", traceId);
             }
             UUID headerTenant = parseUuid(header(record, DomainEventPublisher.HEADER_TENANT), "cabecalho tenantId");
@@ -58,7 +61,9 @@ public class TransactionMonitoringConsumer {
             UUID transactionId = parseUuid(String.valueOf(envelope.data().get("transactionId")), "transactionId");
             TenantContext.runAs(headerTenant, () -> handler.handle(envelope.id(), transactionId));
         } finally {
-            MDC.remove("traceId");
+            if (setMdc) {
+                MDC.remove("traceId");
+            }
         }
     }
 
