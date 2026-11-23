@@ -48,7 +48,7 @@ jobs:
           persist-credentials: false
 
       - if: ${{ matrix.language == 'java-kotlin' }}
-        uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: "25"
@@ -128,7 +128,7 @@ jobs:
 
       # O Trivy resolve as dependências transitivas do pom.xml. Sem ~/.m2 populado ele busca cada POM no
       # Maven Central e toma HTTP 429 (bloqueio de IP por 30 min). Resolver antes e montar ~/.m2 (só leitura).
-      - uses: actions/setup-java@77dd5b2ce225ea11469928ac317850245a74ae78 # v6.2.0
+      - uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880 # v6.3.0
         with:
           distribution: temurin
           java-version: "25"
@@ -187,6 +187,6 @@ jobs:
           persist-credentials: false
 
       # Política em .github/dependency-review-config.yml (HIGH+ e copyleft forte bloqueiam)
-      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+      - uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec # v5.0.1
         with:
           config-file: ./.github/dependency-review-config.yml
